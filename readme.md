@@ -39,6 +39,8 @@ projects/twc_dataset/
   docs/
     documents for internal communication
   manuscript/
+    manuscript.tex
+      main manuscript file (Copernicus/ESSD template), git-synced to Overleaf
     fig_main/
       figures and captions for manuscirpt 
     fig_sm/
@@ -196,6 +198,20 @@ manuscript/
 ```
 
 Use `docs/` for internal notes and `manuscript/` for paper-ready sections.
+
+## Overleaf manuscript
+
+The manuscript is also available on Overleaf for collaborative editing and compilation:
+
+```text
+https://www.overleaf.com/project/6a4ce889a16e7824bdfe9153
+```
+
+Overleaf is git-synced to this repository through Overleaf's GitHub integration (Menu > GitHub). The main file is `manuscript/manuscript.tex`, built on the Copernicus (ESSD) template.
+
+* This repository is the source of truth for coordination (issues, PRs, decisions); Overleaf holds the compiled/rendered view of the manuscript. Do not let the two diverge — treat Overleaf comments the same way as any other out-of-GitHub discussion: copy conclusions back into the relevant issue.
+* Manuscript sections follow the same one-owner-per-section model as the rest of the project: each team edits its own section on its own branch and opens a PR; conflicts are resolved at merge time, never by editing another team's section directly in Overleaf.
+* Because the Overleaf sync can push edits back to GitHub, avoid free-editing directly in Overleaf outside of your own section — treat it the same as editing the repo directly on `main`.
 
 ## Communication rules
 
