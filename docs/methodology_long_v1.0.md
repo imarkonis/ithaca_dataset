@@ -9,10 +9,9 @@ Pipeline scripts `00_initialize.R` – `04e_global_twc_change_storylines.R`.
 
 ## 1. Design principles
 
-- The dataset is a **probabilistic** representation of 1982–2021 change in the terrestrial water cycle over global land, built so that no single input product is privileged: dataset choice is resolved by Monte Carlo sampling from performance-based probabilities rather than by a single best-estimate merge.
-- Two derived axes are the primary distributed quantities: net atmospheric moisture supply **Δ(P−E)** ("water availability") and land–atmosphere water exchange intensity **Δ(P+E)/2** ("water flux"). The latter is a *flux* metric, framed as exchange intensification — not a velocity or residence time.
-- Change is defined throughout as the difference of two equal 20-year means: **2002–2021 minus 1982–2001**, with full-period (40-yr) linear trends provided as a complementary metric.
+- The dataset is a **probabilistic** representation of P and E in the 1982–2021 period over global land with emphasis in its change, built so that no single input product is privileged: dataset choice is resolved by Monte Carlo sampling from performance-based probabilities rather than by a single best-estimate merge.
 - Sampling is stratified by **IPCC AR6 region × biome**, so spatial coherence of dataset selection is preserved within physically meaningful units rather than drawn independently per grid cell.
+- Weights reflect different weighting strategies, with the main one (base) used for the final dataset prioritizing change. The other 7 weight approaches are used for sensitivity analysis.
 
 ## 2. Input datasets
 
@@ -23,21 +22,19 @@ Pipeline scripts `00_initialize.R` – `04e_global_twc_change_storylines.R`.
   - Precipitation (8): CPC, GPCC, GPCP/EARTH, ERA5-Land, FLDAS, MERRA-2, PREC/L, TerraClimate.
   - Evaporation (8): BESS, ERA5-Land, ETMonitor, SynthesizedET, FLDAS, GLEAM, MERRA-2, TerraClimate.
 - **PET products** (GLEAM v4.1a plus a MERRA-2/MSWX suite) for water/energy-limitation and plausibility screening.
-- **Auxiliary observational constraints, validation only:** GRACE terrestrial water storage, ESA CCI soil moisture, and ROBIN in-situ runoff. GRACE is not an ensemble member — consistent with its role as a process-completeness / validation overlay rather than an analytical object.
 
 ## 3. Harmonisation and common grid
 
 *Scripts `01a`, `01b`, `01d`.*
 
 - All products subset to 1982–2021, converted to annual land fields on the common 0.25° grid, and tabulated.
-- A `twc_complete_grid` mask retains only cells where every analysis dataset has valid coverage, so all members are defined on an identical spatial support.
-- ROBIN daily discharge is converted cumecs→mm using catchment area, aggregated to monthly/annual, and matched to grid cells (direct intersection plus nearest-feature fallback for small catchments) to enable a P−E−Q water-balance check.
+- A `twc_complete_grid` mask retains only cells where every analysis dataset has valid coverage, so all members are defined on an identical spatial grid.
 
 ## 4. Spatial stratification
 
 *Script `01g`.*
 
-- Each grid cell is tagged with its IPCC AR6 region (44 land regions after dropping ocean regions and BOB/ARS/GIC), biome, and a hemisphere label (north / tropics / south) derived automatically from each region's latitudinal extent.
+- Each grid cell is tagged with its IPCC AR6 region (44 land regions after dropping ocean regions and BOB/ARS/GIC) and biome derived automatically from each region's latitudinal extent.
 - Additional descriptive layers are attached for downstream stratification and figures: atmospheric circulation regime, latitude zone, main climate class, hydrobelt, and continent.
 - Grid-cell area weights are computed and normalised.
 
@@ -45,9 +42,7 @@ Pipeline scripts `00_initialize.R` – `04e_global_twc_change_storylines.R`.
 
 *Scripts `01h`, `02a`, `02b`, `02c`.*
 
-- Per dataset: area-weighted annual P and E at global and region × biome levels; water availability `avail = P − E` and water flux `flux = (P + E)/2`.
-- Period means (1982–2001, 2002–2021) and their differences give per-dataset ΔP, ΔE, Δavail, Δflux fields.
-- Each cell/dataset receives a compound class from the sign of the two axes: wetter/drier × accelerated/decelerated → the four-class `flux_avail` typology, plus water- vs energy-limitation regime and its transition (`02c`, PET > P screening against AET).
+- Per dataset: area-weighted annual P and E at global and region × biome levels
 
 ## 6. Dataset evaluation
 
@@ -105,8 +100,6 @@ Procedure:
 - Time-series and mean-field consistency checks per dataset at random cells.
 - Reference-agreement diagnostics (majority sign / significance).
 - PET-vs-AET consistency.
-- ROBIN water-balance closure.
-- GRACE and ESA CCI as independent storage / moisture cross-checks.
 - Per-scenario weight diagnostics: effective number of datasets (inverse-Simpson), dominant-dataset maps, adversarial base-vs-inverted agreement.
 
 ## 11. Data records (proposed distribution)
@@ -114,15 +107,5 @@ Procedure:
 - Harmonised per-dataset annual P/E fields on the common grid.
 - The **eight scenario weight fields** at grid and region × biome level (the headline deliverable).
 - MC selection tables / matrices.
-- Aggregated annual P / E / avail / flux ensembles (base 500 + scenarios 100).
+- Aggregated annual P / E / avail ensembles (base 500 + scenarios 100).
 - Per-member and summarised change / trend metrics at global, region, and grid level.
-- Global storyline labels.
-- The region / biome / hemisphere / limitation class atlas.
-- The five single-dataset "coherent worlds" are recoverable as degenerate members and can be shipped as a reference layer.
-
----
-
-## Open decisions
-
-1. **Scope boundary.** Everything above lives in `00`–`04e`. The locked/flipping trustworthiness atlas and the pure-dataset coherent-worlds framing (the intended climactic figure) are constructed *downstream* of `04e` (`05*`/`06*`). Decide whether the ESSD Methods stops at `4e` and treats locked/flipping as a separately-described derived record, or pulls that generation logic in so the trustworthiness atlas is fully specified here.
-2. **Reproducibility flags (§7).** The base-share value and the eight-vs-five scenario count are reproducibility-critical for a data journal; reconcile against the intended design before manuscript prose.
