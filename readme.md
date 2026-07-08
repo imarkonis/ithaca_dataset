@@ -1,17 +1,14 @@
 # A global probabilistic ensemble for land-atmospheric water exchange
 
-This folder contains the working material for the standalone dataset paper on probabilistic 
-terrestrial water-cycle change.
+This folder contains the working material for the standalone dataset paper on terrestrial water-cycle fluxes.
 
-The goal is to prepare a reproducible ESSD-style dataset paper based on the TWC change workflow, 
-with emphasis on dataset-choice uncertainty, probabilistic P–E worlds, region × biome sampling, 
-Monte Carlo ensemble generation, and derived water availability / water flux storylines.
+The goal is to prepare a reproducible dataset paper for submission to ESSD. The analysis uses Monte Carlo simulation to generate a probabilistic ensemble of P and E, based on IPCC region × biome sampling and weighted by dataset agreement that can be used to derive water availability & water flux changes.
 
 ## Working principle
 
 This project should be coordinated through **GitHub Issues and Pull Requests only**.
 
-Please avoid using Teams, email, or private messages for scientific or technical decisions. If a discussion happens outside GitHub, the conclusion must be copied back into the relevant issue.
+We avoid using Teams, email, or private messages for scientific or technical decisions. If a discussion happens outside GitHub, the conclusion must be copied back into the relevant issue.
 
 GitHub Issues are the official record of:
 
@@ -21,7 +18,7 @@ GitHub Issues are the official record of:
 * methodological questions
 * script changes
 * manuscript changes
-* figure requests
+* figure & table requests
 * review comments
 
 This avoids fragmented communication and keeps the dataset paper reproducible.
@@ -63,9 +60,9 @@ docs/group_roles.md
 
 ## Branching rules
 
-Do not commit directly to `main`.
+We do not commit directly to `main`.
 
-Use one branch per task or issue.
+We use one branch per task or issue.
 
 Branch names should be short and descriptive:
 
@@ -77,13 +74,13 @@ feat/workflow-figure
 review/reproducibility-00-04e
 ```
 
-After finishing the task, open a Pull Request into `main`.
+After finishing the task, we open a Pull Request into `main`.
 
 ## Issue-first workflow
 
 Every meaningful change should start from an issue.
 
-Use issues for:
+We use issues for:
 
 * new scripts;
 * script revisions;
@@ -95,7 +92,7 @@ Use issues for:
 * reproducibility checks;
 * bugs or inconsistencies.
 
-Do not start substantial work without an issue.
+We do not start substantial work without an issue. We do not create issues for minro things.
 
 Each issue should include:
 
@@ -137,11 +134,9 @@ Closes #12
 ## What changed
 - Updated the Methods outline to reflect the eight weighting scenarios.
 - Added a note that gridded MC products are derived by region–biome-to-grid extrapolation.
-- Updated the open decisions list.
 
 ## Files changed
 - docs/dataset_paper_methodology.md
-- docs/open_decisions.md
 
 ## Checks
 - No scripts changed.
@@ -182,12 +177,12 @@ Scripts should follow a consistent structure:
 
 When editing scripts:
 
-* keep each script focused on one task;
-* avoid hidden dependencies;
-* use explicit input and output file names;
-* document any changed output;
-* add simple validation checks where possible;
-* do not change methodology-critical constants without an issue;
+* we keep each script focused on one task;
+* we avoid hidden dependencies;
+* we use explicit input and output file names;
+* we document any changed output;
+* we add simple validation checks where possible;
+* we do not change methodology-critical constants without an issue;
 
 ## Working with manuscript text
 
@@ -209,9 +204,9 @@ https://www.overleaf.com/project/6a4ce889a16e7824bdfe9153
 
 Overleaf is git-synced to this repository through Overleaf's GitHub integration (Menu > GitHub). The main file is `manuscript/manuscript.tex`, built on the Copernicus (ESSD) template.
 
-* This repository is the source of truth for coordination (issues, PRs, decisions); Overleaf holds the compiled/rendered view of the manuscript. Do not let the two diverge — treat Overleaf comments the same way as any other out-of-GitHub discussion: copy conclusions back into the relevant issue.
-* Manuscript sections follow the same one-owner-per-section model as the rest of the project: each team edits its own section on its own branch and opens a PR; conflicts are resolved at merge time, never by editing another team's section directly in Overleaf.
-* Because the Overleaf sync can push edits back to GitHub, avoid free-editing directly in Overleaf outside of your own section — treat it the same as editing the repo directly on `main`.
+* This repository is the source of truth for coordination (issues, PRs, decisions); Overleaf holds the compiled/rendered view of the manuscript. We do not let the two diverge — we treat Overleaf comments the same way as any other out-of-GitHub discussion: copy conclusions back into the relevant issue if needed.
+* Manuscript sections follow the same one-owner-per-section model as the rest of the project: each team/person edits their own section on its own branch; conflicts are resolved at merge time, never by editing another team's section directly in Overleaf.
+* Because the Overleaf sync can push edits back to GitHub, we avoid free-editing directly in Overleaf outside of our own section.
 
 ## Communication rules
 
