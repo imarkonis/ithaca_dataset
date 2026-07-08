@@ -9,7 +9,7 @@ Pipeline scripts `00_initialize.R` – `04e_global_twc_change_storylines.R`.
 
 ## 1. Design principles
 
-- The dataset is a **probabilistic** representation of P and E in the 1982–2021 period over global land with emphasis in its change, built so that no single input product is privileged: dataset choice is resolved by Monte Carlo sampling from performance-based probabilities rather than by a single best-estimate merge.
+- The dataset is a **probabilistic** representation of P and E in the 1982–2021 period over global land with emphasis in their change, built so that no single input product is privileged: dataset choice is resolved by Monte Carlo sampling from performance-based probabilities rather than by a single best-estimate merge.
 - Sampling is stratified by **IPCC AR6 region × biome**, so spatial coherence of dataset selection is preserved within physically meaningful units rather than drawn independently per grid cell.
 - Weights reflect different weighting strategies, with the main one (base) used for the final dataset prioritizing change. The other 7 weight approaches are used for sensitivity analysis.
 
