@@ -1,11 +1,11 @@
 # Dataset paper methodology — v1.0
 
 ## Purpose
-We aim to describe a probabilistic ensemble dataset for global terrestrial water-cycle change, 
+We aim to describe a probabilistic ensemble dataset for global terrestrial water cycle, 
 based on dataset-choice uncertainty in P and E.
 
 ## Core idea
-The dataset represents plausible P–E worlds rather than a single best product. 
+The dataset represents plausible P, E worlds rather than a single best product. 
 Dataset choice is sampled probabilistically at the IPCC region × biome level.
 
 ## Main methodological blocks
@@ -16,6 +16,5 @@ Dataset choice is sampled probabilistically at the IPCC region × biome level.
 5. Physical plausibility screening
 6. Weighting scenarios
 7. Monte Carlo ensemble generation
-8. Change metrics and trends
-9. Validation and data records
+8. Validation and data records
 
