@@ -18,9 +18,11 @@ if (!dir.exists(dirname(PATH_SAVE))) {
 PATH_OUTPUT <- file.path(PATH_SAVE, "ithaca_dataset")
 PATH_OUTPUT_DATA <- file.path(PATH_OUTPUT, "data")
 PATH_OUTPUT_RAW <- file.path(PATH_OUTPUT_DATA, "raw")
+PATH_OUTPUT_RAW_PREC <- paste0(PATH_OUTPUT_RAW, "prec") 
+PATH_OUTPUT_RAW_EVAP <- paste0(PATH_OUTPUT_RAW, "evap") 
+PATH_OUTPUT_RAW_OTHER <- file.path(PATH_OUTPUT_RAW, "other")
 PATH_OUTPUT_FIGURES <- file.path(PATH_OUTPUT, "figures")
 PATH_OUTPUT_TABLES <- file.path(PATH_OUTPUT, "tables")
-PATH_OUTPUT_RAW_OTHER <- file.path(PATH_OUTPUT_RAW, "other")
 
 # Analysis ===================================================================
 
@@ -28,9 +30,11 @@ paths_to_create <- c(
   PATH_OUTPUT,
   PATH_OUTPUT_DATA,
   PATH_OUTPUT_RAW,
+  PATH_OUTPUT_RAW_PREC, 
+  PATH_OUTPUT_RAW_EVAP,
+  PATH_OUTPUT_RAW_OTHER,
   PATH_OUTPUT_FIGURES,
-  PATH_OUTPUT_TABLES,
-  PATH_OUTPUT_RAW_OTHER
+  PATH_OUTPUT_TABLES
 )
 
 invisible(lapply(

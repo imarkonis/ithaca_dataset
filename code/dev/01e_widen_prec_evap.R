@@ -10,7 +10,7 @@
 
 # Libraries ==================================================================
 
-source("source/twc_change.R")
+source("_source.R")
 
 # Inputs =====================================================================
 
@@ -18,8 +18,6 @@ prec_evap_raw <- read_fst(
   file.path(PATH_OUTPUT_RAW, "other/prec_evap_raw.fst"),
   as.data.table = TRUE
 )
-
-# Analysis ===================================================================
 
 # Constants & variables ======================================================
 
