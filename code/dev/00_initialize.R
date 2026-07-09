@@ -1,13 +1,14 @@
 # ============================================================================
-# Initialize project paths for the TWC change workflow
+# Initialize project paths for the ithaca dataset workflow
 #
-# This script defines the input and output directories for the TWC change
+# This script defines the input and output directories for the ithaca dataset
 # project, creates the required folder structure, and saves all path objects
 # to paths.Rdata for downstream scripts.
 # ============================================================================
 
 # Constants & Variables ======================================================
 
+PATH_SAVE <- file.path(PATH_ROOT, "data_projects/ithaca_dataset")
 PATH_OUTPUT <- file.path(PATH_SAVE, "twc_change")
 PATH_OUTPUT_DATA <- file.path(PATH_OUTPUT, "data")
 PATH_OUTPUT_RAW <- file.path(PATH_OUTPUT_DATA, "raw")
