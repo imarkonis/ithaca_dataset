@@ -8,7 +8,8 @@
 
 # Constants & Variables ======================================================
 
-PATH_SAVE <- file.path(PATH_ROOT, "data_projects/ithaca_dataset")
+PATH_SAVE <- "/mnt/shared/data_projects/ithaca_dataset" # Change this to the local path for saving the script output 
+
 PATH_OUTPUT <- file.path(PATH_SAVE, "twc_change")
 PATH_OUTPUT_DATA <- file.path(PATH_OUTPUT, "data")
 PATH_OUTPUT_RAW <- file.path(PATH_OUTPUT_DATA, "raw")
@@ -33,6 +34,13 @@ invisible(lapply(
   recursive = TRUE,
   showWarnings = FALSE
 ))
+
+# Validation ==================================================================
+
+if (!all(dir.exists(paths_to_create))) {
+  stop("Could not create output folders. Edit PATH_SAVE at the top of this script.",
+       call. = FALSE)
+}
 
 # Outputs ====================================================================
 
