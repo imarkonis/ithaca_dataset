@@ -9,7 +9,7 @@
 
 # Libraries ==================================================================
 
-source("source/twc_change.R")
+source("source/_source.R")
 source("source/data_registry.R")
 
 library(lubridate)
@@ -20,14 +20,6 @@ library(doParallel)
 # Parallel setup ==============================================================
 
 registerDoParallel(max(N_DATASETS_PREC, N_DATASETS_EVAP))
-
-# Constants & Variables =======================================================
-
-PATH_OUTPUT_RAW_PREC <- file.path(PATH_OUTPUT_RAW, "prec")
-PATH_OUTPUT_RAW_EVAP <- file.path(PATH_OUTPUT_RAW, "evap")
-
-dir.create(PATH_OUTPUT_RAW_PREC, recursive = TRUE, showWarnings = FALSE)
-dir.create(PATH_OUTPUT_RAW_EVAP, recursive = TRUE, showWarnings = FALSE)
 
 # Functions ==================================================================
 

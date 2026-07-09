@@ -9,11 +9,11 @@
 # 5. Saves the aggregated object for observational dataset plotting
 # ============================================================================
 
+# Libraries ==================================================================
+
+source("source/_source.R")
 
 # Inputs ======================================================================
-
-source("source/twc_change.R")
-
 
 prec_evap <- readRDS(
   file.path(PATH_OUTPUT_DATA, "prec_evap.Rds")

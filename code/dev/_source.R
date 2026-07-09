@@ -1,4 +1,3 @@
-source('source/main.R')
 load(paste0("../../shared/data_projects/ithaca/twc_change/paths.Rdata"))
   
 # Datasets
