@@ -112,7 +112,6 @@ List scripts, docs, or outputs involved.
 ## Completion criteria
 How do we know this issue is done?
 ```
-
 ## Pull request rules
 
 Each Pull Request should correspond to one issue.

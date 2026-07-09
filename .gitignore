@@ -1,0 +1,8 @@
+.Rproj
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.gitignore
+code\dev\00_initialize.R
+ithaca_dataset.Rproj
