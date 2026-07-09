@@ -8,9 +8,14 @@
 
 # Constants & Variables ======================================================
 
-PATH_SAVE <- "/mnt/shared/data_projects/ithaca_dataset" # Change this to the local path for saving the script output 
+PATH_SAVE <-  "C:/Users/imark/ownCloud/Yannis/15_Data/R/" # Change this to the local path for saving the script output 
 
-PATH_OUTPUT <- file.path(PATH_SAVE, "twc_change")
+if (!dir.exists(dirname(PATH_SAVE))) {
+  stop("Parent folder '", dirname(PATH_SAVE), "' does not exist. ",
+       "Edit PATH_SAVE at the top of this script.", call. = FALSE)
+}
+
+PATH_OUTPUT <- file.path(PATH_SAVE, "ithaca_dataset")
 PATH_OUTPUT_DATA <- file.path(PATH_OUTPUT, "data")
 PATH_OUTPUT_RAW <- file.path(PATH_OUTPUT_DATA, "raw")
 PATH_OUTPUT_FIGURES <- file.path(PATH_OUTPUT, "figures")
