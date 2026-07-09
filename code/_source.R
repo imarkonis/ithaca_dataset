@@ -1,5 +1,5 @@
-load(paste0("../../shared/data_projects/ithaca/twc_change/paths.Rdata"))
-  
+load("C:/Users/imark/ownCloud/Yannis/15_Data/R/ithaca_dataset/paths.Rdata") # Change this to the local path for saving the script output 
+
 # Datasets
 PREC_NAMES_SHORT <- c('ERA5L', "FLDAS", "MERRA", "TERRA", "MSWEP")
 
