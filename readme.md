@@ -112,6 +112,20 @@ List scripts, docs, or outputs involved.
 ## Completion criteria
 How do we know this issue is done?
 ```
+## .gitignore
+
+Please add this to .gitignore file locally.
+
+```text
+.Rproj
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.gitignore
+code\dev\00_initialize.R
+ithaca_dataset.Rproj
+```
 
 ## Pull request rules
 
