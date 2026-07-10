@@ -1,4 +1,4 @@
-# Figure Plan — TWC Dataset Paper (ESSD)
+# Figure Plan
 
 ## Purpose
 
