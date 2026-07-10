@@ -39,7 +39,7 @@ the product *enables* is appropriate; a results narrative is not.
 * S2 — Internal quality evidence (reference agreement, PET consistency)
 * S3 — Ensemble convergence
 * S4 — Extended weight diagnostics, all eight scenarios
-* S5 — **ΔP–ΔE scatter, one panel per weighting scenario**
+* S5 — ΔP–ΔE scatter, one panel per weighting scenario
 * S6 — Figure 2 for further regions
 * S7 — Per-dataset climatology and trend fields
 * S8 — Regional sensitivity, full scenario set
