@@ -22,6 +22,6 @@
 
 **Recommendation:** inputs sufficiently on pRecipe/evapoRe Zenodo -> close #2 and point #3 at these DOIs.
 
-**Warning:** Time cover: GPCP start in precipe is 1982 but server start is 1981.
+**Warning:** Time cover: GPCC start in precipe is 1982 but server start is 1981.
 
 **Warning:** Minor naming inconsistencies, e.g. merra2-land vs merra-2.
