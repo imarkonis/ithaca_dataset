@@ -143,11 +143,24 @@ Additional structure checks:
 
 ### Reference-style gate
 
-- [ ] References follow the Copernicus author–year style used by the official Copernicus template.
-- [ ] In-text citations and reference-list entries are generated through the Copernicus template/bibliography style.
-- [ ] All cited datasets, software, model code, repositories, and persistent records with DOIs are included in the reference list, not only mentioned in the Data availability or Code availability sections.
-- [ ] Data citations include creators, year, title, repository/publisher, version where applicable, and DOI or persistent identifier.
-- [ ] URLs are written out explicitly rather than hidden behind linked text.
+- [ ] References follow the Copernicus author–year style. In-text citations should appear as either `Smith (2009)` or `(Smith, 2009)`. Multiple citations in one place are separated by semicolons, e.g. `(Smith, 2009; Mueller et al., 2010)`.
+- [ ] Every item cited in the text appears in the reference list, and every reference-list item is cited in the manuscript.
+- [ ] Literature references should preferably be published, accepted, or available as a preprint with a DOI. Works listed as “submitted”, “in preparation”, or “in review” may be used during review only if accessible to reviewers, but should not remain in the final accepted manuscript unless published, accepted, or available as a DOI preprint.
+- [ ] The full author list is provided in the reference list, with last names followed by initials. Do not use bold or italic formatting in in-text citations or in the reference list.
+- [ ] Journal references include the article title, abbreviated journal name, volume, full page range or article number, DOI, and publication year.
+- [ ] Data, software, model code, notebooks, and repository records used in the manuscript are cited in the text and included in the reference list, not only mentioned in the Data availability or Code availability sections.
+- [ ] URLs are written out explicitly rather than hidden behind linked text
+- [ ] References are ordered alphabetically under the first author’s name. For the same first author, follow Copernicus ordering: single-author papers first, then two-author papers, then team papers; use year letters such as `2010a` and `2010b` where needed.
+#### Example reference entries:
+
+Journal article:
+Porter, J. G., De Bruyn, W., and Saltzman, E. S.: Eddy flux measurements of sulfur dioxide deposition to the sea surface, Atmos. Chem. Phys., 18, 15291–15305, https://doi.org/10.5194/acp-18-15291-2018, 2018.
+
+Dataset:
+Loew, A., Bennartz, R., Fell, F., Lattanzio, A., Doutriaux-Boucher, M., and Schulz, J.: Surface Albedo Validation Sites, EUMETSAT [data set], https://doi.org/10.15770/EUM_SEC_CLM_1001, 2015.
+
+Software/code:
+Randall, D., Dazlich, D., Heikes, R., and Konor, C.: CSU model for DCMIP 2016, Zenodo [code], https://doi.org/10.5281/zenodo.5800992018, 2017.
 
 ## 6. ESSD-specific final gate for this project
 _**Note**:- This section is a project-specific pre-submission gate derived from ESSD/Copernicus guidance and the agreed ITHACA/TWC dataset-paper scope; it is not a verbatim journal requirement._
