@@ -134,6 +134,7 @@ Additional structure checks:
 - [ ] Supplement numbering follows Copernicus style: equations `(S1)`, figures `Fig. S5`, tables `Table S6`, sections `S3`, `S3.1`, etc.
 
 ## 6. ESSD-specific final gate for this project
+_**Note**:- This section is a project-specific pre-submission gate derived from ESSD/Copernicus guidance and the agreed ITHACA/TWC dataset-paper scope; it is not a verbatim journal requirement._
 
 For the ITHACA/TWC dataset paper, request review after the following are true:
 
