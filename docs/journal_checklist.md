@@ -52,6 +52,14 @@ ESSD/Copernicus does **not** publish hard word-count limits for data description
 - [ ] Maps/aerials using third-party providers include required copyright, attribution, and licence statements in the map or caption.
 - [ ] Reused/adapted figures and tables include citations and required permission/licence statements in captions.
 
+##### Graphical abstract / key figure gate
+
+- [ ] If a graphical abstract is used, it is uploaded as the article key figure, which is the preferred Copernicus/ESSD route.
+- [ ] The key figure is designed as a concise visual summary of the dataset paper, not as an additional scientific-results figure.
+- [ ] If the graphical abstract is intended to appear inside the article PDF, it is unnumbered and placed directly after the text abstract.
+- [ ] If included in the article PDF, the graphical abstract file is also included in the final figure ZIP archive.
+- [ ] The graphical abstract follows the same technical figure requirements as other figures: accepted format, sufficient resolution, embedded fonts where applicable, and readable text.
+
 ## 4. Data, code, repository, DOI, and licence gates
 
 - [ ] The data described in the paper are stored in a suitable research data repository; cloud storage/private links outside a repository are **not acceptable**.
@@ -127,11 +135,19 @@ Additional structure checks:
 - [ ] Competing interests section is present. If none: “The authors declare that they have no conflict of interest.”
 - [ ] Acknowledgements include relevant research infrastructure where applicable.
 - [ ] Financial support includes funder names and grant agreement numbers.
-- [ ] References follow Copernicus author-year style.
 - [ ] Data, code, software, and repository records with DOIs are included in the reference list.
 - [ ] Appendices are used for additional figures/tables/technical details that support the paper but are not critical to the main flow.
 - [ ] Supplements are used only for items that cannot reasonably be included in the main text or appendices; they must not contain scientific interpretations beyond the manuscript.
 - [ ] Supplement numbering follows Copernicus style: equations `(S1)`, figures `Fig. S5`, tables `Table S6`, sections `S3`, `S3.1`, etc.
+- [ ] Supplements needs to be submitted as separate files (PDF or ZIP file)  published alongside the manuscript, not embedded as normal sections inside the main paper.
+
+### Reference-style gate
+
+- [ ] References follow the Copernicus author–year style used by the official Copernicus template.
+- [ ] In-text citations and reference-list entries are generated through the Copernicus template/bibliography style.
+- [ ] All cited datasets, software, model code, repositories, and persistent records with DOIs are included in the reference list, not only mentioned in the Data availability or Code availability sections.
+- [ ] Data citations include creators, year, title, repository/publisher, version where applicable, and DOI or persistent identifier.
+- [ ] URLs are written out explicitly rather than hidden behind linked text.
 
 ## 6. ESSD-specific final gate for this project
 _**Note**:- This section is a project-specific pre-submission gate derived from ESSD/Copernicus guidance and the agreed ITHACA/TWC dataset-paper scope; it is not a verbatim journal requirement._
