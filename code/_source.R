@@ -1,3 +1,6 @@
+library(data.table)
+library(ggplot2)
+
 load("C:/Users/imark/ownCloud/Yannis/15_Data/R/ithaca_dataset/paths.Rdata") # Change this to the local path for saving the script output 
 
 # Datasets

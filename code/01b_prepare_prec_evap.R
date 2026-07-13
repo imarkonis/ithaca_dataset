@@ -9,11 +9,9 @@
 
 # Libraries ==================================================================
 
-source("source/_source.R")
-source("source/data_registry.R")
+source("code/_source.R")
 
 library(lubridate)
-library(raster)
 library(pRecipe)
 library(doParallel)
 

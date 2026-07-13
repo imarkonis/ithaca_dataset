@@ -15,12 +15,13 @@
 
 # Libraries ===================================================================
 
-source("source/_source.R")
-source("source/geo_functions.R")
+source("code/_source.R")
+
+library(pRecipe)
 
 # Input datasets ==============================================================
 
-masks <- pRecipe::pRecipe_masks()
+masks <- pRecipe_masks()
 
 twc_grid <- readRDS(
   file.path(PATH_OUTPUT_DATA, "twc_complete_grid.Rds")
