@@ -135,7 +135,7 @@ Additional structure checks:
 
 ## 6. ESSD-specific final gate for this project
 
-For the ITHACA/TWC dataset paper, do not request review until all are true:
+For the ITHACA/TWC dataset paper, request review after the following are true:
 
 - [ ] Target journal explicitly stated as **Earth System Science Data (ESSD)**.
 - [ ] Article type explicitly treated as **Data description article**.
