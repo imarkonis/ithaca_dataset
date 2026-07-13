@@ -11,7 +11,7 @@
 
 # Inputs ======================================================================
 
-source("source/_source.R")
+source("code/_source.R")
 
 mc_global_metrics_base <- readRDS(
   file.path(PATH_OUTPUT_DATA,
