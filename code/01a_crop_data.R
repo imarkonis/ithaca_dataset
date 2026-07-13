@@ -1,5 +1,4 @@
-source("code/dev/_source.R")
-source('source/data_registry.R')
+source("source/_source.R")
 
 library(pRecipe)
 library(doParallel)
