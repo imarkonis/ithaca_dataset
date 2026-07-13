@@ -1,3 +1,4 @@
+
 # A global probabilistic ensemble for land-atmospheric water exchange
 
 This folder contains the working material for the standalone dataset paper on terrestrial water-cycle fluxes.
@@ -18,7 +19,7 @@ GitHub Issues are the official record of:
 * methodological questions
 * script changes
 * manuscript changes
-* figure & table requests
+* figure and table requests
 * review comments
 
 This avoids fragmented communication and keeps the dataset paper reproducible.
