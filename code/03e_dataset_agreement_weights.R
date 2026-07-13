@@ -29,7 +29,7 @@
 # are therefore treated identically as relative-bias losses.
 # ============================================================================
 
-source("source/_source.R")
+source("code/_source.R")
 
 dataset_ranks <- readRDS(file.path(PATH_OUTPUT_DATA, "dataset_ranks.Rds"))
 
