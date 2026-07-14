@@ -4,5 +4,6 @@
 .RData
 .Ruserdata
 .gitignore
-code\00_initialize.R
+#code\00_initialize.R
+#code/_source
 ithaca_dataset.Rproj
