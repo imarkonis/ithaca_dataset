@@ -6,15 +6,11 @@
 # FULL_PERIOD (1982-2021), and saves the cropped files under PATH_OUTPUT_INPUT
 # for the downstream preparation step (01b). The raw files are left untouched.
 #
-# The yearly date axis of each dataset is rebuilt from the period token in its
-# filename rather than taken from the file, because the products do not encode
-# time consistently (see yearly_dates_from_filename).
-#
 # The cropped files keep the Zenodo naming convention, but their period token is
-# rewritten to the cropped period, so that a cropped file is never mistaken for
-# the original download:
-#   gpcc-v2022_tp_mm_land_198101_202012_025_yearly.nc  (raw)
-#   gpcc-v2022_tp_mm_land_198201_202112_025_yearly.nc  (cropped)
+# rewritten to the period each file actually contains, so that a cropped file is
+# never mistaken for the original download:
+#   gpcc-v2022_tp_mm_land_198101_202012_025_yearly.nc  (raw,     1981-2020)
+#   gpcc-v2022_tp_mm_land_198201_202012_025_yearly.nc  (cropped, 1982-2020)
 # ============================================================================
 
 # Libraries ==================================================================
@@ -99,38 +95,8 @@ cropped_basename <- function(file, period) {
   }, character(1), USE.NAMES = FALSE)
 }
 
-## Build the yearly date axis of a dataset from its filename period.
-##
-## We do not trust the time coordinate stored in the file: GLEAM writes it as
-## plain layer indices (0, 1, ... n-1) rather than a CF date axis. pRecipe's
-## aux_date() then reads those as "days since 1970-01-01", placing every layer
-## in 1970, so the FULL_PERIOD selection matches nothing and raster::subset()
-## fails with "incorrect number of layer names". Rebuilding the axis from the
-## filename gives every product the same, correct yearly axis.
-yearly_dates_from_filename <- function(file, n_layers) {
-  dataset_years <- do.call(seq, as.list(dataset_period(file)))
-
-  if (length(dataset_years) != n_layers) {
-    stop(
-      basename(file), " has ", n_layers, " layers but its filename spans ",
-      dataset_years[1], "-", dataset_years[length(dataset_years)],
-      " (", length(dataset_years), " years).",
-      call. = FALSE
-    )
-  }
-
-  as.Date(paste0(dataset_years, "-01-01"))
-}
-
 crop_and_save_file <- function(file, path_out, period) {
-  dataset_brick <- brick(file)
-
-  dataset_brick <- setZ(
-    dataset_brick,
-    yearly_dates_from_filename(file, nlayers(dataset_brick))
-  )
-
-  result <- subset_data(dataset_brick, yrs = period)
+  result <- subset_data(file, yrs = period)
   saveNC(result, file.path(path_out, cropped_basename(file, period)))
 
   invisible(file)
