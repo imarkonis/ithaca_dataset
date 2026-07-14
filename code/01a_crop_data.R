@@ -6,6 +6,10 @@
 # FULL_PERIOD (1982-2021), and saves the cropped files under PATH_OUTPUT_INPUT
 # for the downstream preparation step (01b). The raw files are left untouched.
 #
+# The yearly date axis of each dataset is rebuilt from the period token in its
+# filename rather than taken from the file, because the products do not encode
+# time consistently (see yearly_dates_from_filename).
+#
 # The cropped files keep the Zenodo naming convention, but their period token is
 # rewritten to the cropped period, so that a cropped file is never mistaken for
 # the original download:
@@ -50,47 +54,83 @@ if (length(raw_files) == 0) {
 
 # Functions ==================================================================
 
-## Rewrite the "<start><end>" period token of a Zenodo filename to the cropped
-## period, e.g. "_198101_202012_" -> "_198201_202112_". Filenames that do not
-## carry the token are returned unchanged.
-cropped_basename <- function(file, period) {
-  sub(
-    "_[0-9]{6}_[0-9]{6}_",
-    paste0("_", period[["START"]], "01_", period[["END"]], "12_"),
-    basename(file)
+## First and last year a dataset covers, read from the period token in its
+## filename, e.g. "..._198001_202312_..." -> c(1980, 2023).
+dataset_period <- function(file) {
+  period_token <- regmatches(
+    basename(file),
+    regexpr("[0-9]{6}_[0-9]{6}", basename(file))
+  )
+
+  if (length(period_token) == 0) {
+    stop("No period token in filename: ", basename(file), call. = FALSE)
+  }
+
+  c(
+    as.integer(substr(period_token, 1, 4)),
+    as.integer(substr(period_token, 8, 11))
   )
 }
 
-## raster::brick() picks the data variable automatically. Some products (GLEAM)
-## ship extra variables (e.g. time bounds), which makes that guess fail with
-## "incorrect number of layer names". Fall back to naming the data variable
-## explicitly: the first 3-D variable that is not a bounds/CRS helper.
-read_dataset_brick <- function(file) {
-  dataset_brick <- try(brick(file), silent = TRUE)
+## Years a dataset retains once cropped: its own coverage clipped to the study
+## period. Datasets need not span the whole study period (GPCC ends in 2020).
+cropped_period <- function(file, period) {
+  dataset_years <- dataset_period(file)
 
-  if (!inherits(dataset_brick, "try-error")) {
-    return(dataset_brick)
+  c(
+    max(dataset_years[1], period[["START"]]),
+    min(dataset_years[2], period[["END"]])
+  )
+}
+
+## Name a cropped file after the period it actually contains, so it can never be
+## confused with the raw download, e.g.
+##   gpcc-v2022_tp_mm_land_198101_202012_025_yearly.nc  (raw, 1981-2020)
+##   gpcc-v2022_tp_mm_land_198201_202012_025_yearly.nc  (cropped, 1982-2020)
+cropped_basename <- function(file, period) {
+  vapply(file, function(dataset_file) {
+    cropped_years <- cropped_period(dataset_file, period)
+
+    sub(
+      "_[0-9]{6}_[0-9]{6}_",
+      paste0("_", cropped_years[1], "01_", cropped_years[2], "12_"),
+      basename(dataset_file)
+    )
+  }, character(1), USE.NAMES = FALSE)
+}
+
+## Build the yearly date axis of a dataset from its filename period.
+##
+## We do not trust the time coordinate stored in the file: GLEAM writes it as
+## plain layer indices (0, 1, ... n-1) rather than a CF date axis. pRecipe's
+## aux_date() then reads those as "days since 1970-01-01", placing every layer
+## in 1970, so the FULL_PERIOD selection matches nothing and raster::subset()
+## fails with "incorrect number of layer names". Rebuilding the axis from the
+## filename gives every product the same, correct yearly axis.
+yearly_dates_from_filename <- function(file, n_layers) {
+  dataset_years <- do.call(seq, as.list(dataset_period(file)))
+
+  if (length(dataset_years) != n_layers) {
+    stop(
+      basename(file), " has ", n_layers, " layers but its filename spans ",
+      dataset_years[1], "-", dataset_years[length(dataset_years)],
+      " (", length(dataset_years), " years).",
+      call. = FALSE
+    )
   }
 
-  nc <- nc_open(file)
-  on.exit(nc_close(nc), add = TRUE)
-
-  var_n_dims <- vapply(nc$var, function(x) x$ndims, integer(1))
-
-  data_vars <- names(var_n_dims)[
-    var_n_dims >= 3 &
-      !grepl("bnds|bounds|crs|spatial_ref", names(var_n_dims), ignore.case = TRUE)
-  ]
-
-  if (length(data_vars) == 0) {
-    stop("No 3-D data variable found in ", basename(file), call. = FALSE)
-  }
-
-  brick(file, varname = data_vars[1])
+  as.Date(paste0(dataset_years, "-01-01"))
 }
 
 crop_and_save_file <- function(file, path_out, period) {
-  result <- subset_data(read_dataset_brick(file), yrs = period)
+  dataset_brick <- brick(file)
+
+  dataset_brick <- setZ(
+    dataset_brick,
+    yearly_dates_from_filename(file, nlayers(dataset_brick))
+  )
+
+  result <- subset_data(dataset_brick, yrs = period)
   saveNC(result, file.path(path_out, cropped_basename(file, period)))
 
   invisible(file)
@@ -100,7 +140,7 @@ crop_and_save_file <- function(file, path_out, period) {
 
 foreach(
   file_count = seq_along(raw_files),
-  .packages = c("raster", "pRecipe", "lubridate", "ncdf4")
+  .packages = c("raster", "pRecipe", "lubridate")
 ) %dopar% {
   crop_and_save_file(raw_files[file_count], PATH_OUTPUT_INPUT, FULL_PERIOD)
 }
@@ -123,6 +163,29 @@ if (length(invalid_files) > 0) {
     "Cropping did not produce valid files:\n",
     paste(invalid_files, collapse = "\n"),
     call. = FALSE
+  )
+}
+
+## Report datasets that do not cover the whole study period, so partial coverage
+## is a stated fact rather than a surprise downstream.
+partial_files <- raw_files[
+  vapply(
+    raw_files,
+    function(dataset_file) {
+      !identical(
+        as.integer(cropped_period(dataset_file, FULL_PERIOD)),
+        as.integer(c(FULL_PERIOD[["START"]], FULL_PERIOD[["END"]]))
+      )
+    },
+    logical(1),
+    USE.NAMES = FALSE
+  )
+]
+
+if (length(partial_files) > 0) {
+  message(
+    "Datasets not covering ", FULL_PERIOD["START"], "-", FULL_PERIOD["END"], ":\n",
+    paste0("  ", cropped_basename(partial_files, FULL_PERIOD), collapse = "\n")
   )
 }
 
