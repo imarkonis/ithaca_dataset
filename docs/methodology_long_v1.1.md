@@ -19,7 +19,7 @@ Pipeline scripts `00_initialize.R` – `04e_global_twc_change_storylines.R`, plu
 
 *Scripts `01a`–`01c`; constants in `source/twc_change.R`.*
 
-- Five coherent precipitation–evaporation **analysis pairs** at 0.25°, annual, land-only: ERA5-Land, FLDAS, MERRA-2, TerraClimate, and GLEAM/MSWEP. Note the deliberate pairing: MSWEP precipitation is joined to GLEAM evaporation and relabelled `GLEAM` so each of the five worlds is a self-consistent P–E pair (`01e`).
+- Five coherent precipitation–evaporation **analysis pairs** at 0.25°, annual, land-only: ERA5-Land, FLDAS, MERRA-2, TerraClimate, and GLEAM/MSWEP. Note the deliberate pairing: MSWEP precipitation is joined to GLEAM evaporation and relabelled `GLEAM` so each of the five worlds is a self-consistent P–E pair (`01b`).
 - Two larger **reference ensembles** used only for evaluation, not sampling:
   - Precipitation (8): CPC, GPCC, GPCP/EARTH, ERA5-Land, FLDAS, MERRA-2, PREC/L, TerraClimate.
   - Evaporation (8): BESS, ERA5-Land, ETMonitor, SynthesizedET, FLDAS, GLEAM, MERRA-2, TerraClimate.
