@@ -3,11 +3,11 @@
 # for the TWC change workflow.
 #
 # This script reads the cropped yearly land datasets produced by
-# 01a_crop_data, converts them to tabular format, and builds a combined raw
-# long table (saved as prec_evap_raw.fst). It then keeps only the selected
-# analysis datasets, applies the intended MSWEP-GLEAM pairing, reshapes to wide
-# format, and saves the combined precipitation-evaporation table
-# (prec_evap.Rds).
+# 01a_crop_data (in PATH_OUTPUT_INPUT), converts them to tabular format, and
+# builds a combined raw long table (saved as prec_evap_raw.fst). It then keeps
+# only the selected analysis datasets, applies the intended MSWEP-GLEAM pairing,
+# reshapes to wide format, and saves the combined precipitation-evaporation
+# table (prec_evap.Rds). All outputs are written to PATH_OUTPUT_OUTPUT.
 #
 # (Merges the former 01b_prepare_prec_evap.R and 01e_widen_prec_evap.R.)
 # ============================================================================
@@ -19,18 +19,44 @@ source("code/_source.R")
 library(lubridate)
 library(pRecipe)
 
+# Constants & Variables ======================================================
+
+# Map the dataset token in each Zenodo filename (the part before the first "_")
+# to the short dataset name used across the workflow. Mirrors the dataset names
+# downloaded in 00b_data_download.
+DATASET_NAME_BY_TOKEN <- c(
+  "cpc"          = "CPC",
+  "gpcc"         = "GPCC",
+  "em-earth"     = "EARTH",
+  "era5-land"    = "ERA5L",
+  "fldas"        = "FLDAS",
+  "merra"        = "MERRA",
+  "precl"        = "PRECL",
+  "terraclimate" = "TERRA",
+  "mswep"        = "MSWEP",
+  "bess"         = "BESS",
+  "etmonitor"    = "ETMON",
+  "etsynthesis"  = "ETSYN",
+  "gleam-v4-1a"  = "GLEAM"
+)
+
 # Functions ==================================================================
 
-build_dataset_table <- function(datasets, names_analysis, names_ensemble, path_out) {
-  names_used <- unique(c(names_ensemble, names_analysis))
+resolve_dataset_names <- function(files) {
+  tokens <- names(DATASET_NAME_BY_TOKEN)
 
-  datasets_used <- datasets[fname %in% names_used, .(
-    name,
-    fname,
-    file = file.path(path_out, paste0(fname, "_yearly.nc"))
-  )]
+  vapply(basename(files), function(fname) {
+    hits <- tokens[vapply(tokens, grepl, logical(1), x = fname, fixed = TRUE)]
+    if (length(hits) != 1) return(NA_character_)
+    DATASET_NAME_BY_TOKEN[[hits]]
+  }, character(1), USE.NAMES = FALSE)
+}
 
-  return(datasets_used[])
+build_input_table <- function(files) {
+  data.table(
+    name = resolve_dataset_names(files),
+    file = files
+  )
 }
 
 grid_files_to_dt <- function(datasets_used, variable_name) {
@@ -72,50 +98,37 @@ plot_mean_maps <- function(dt_plot, var_name) {
 
 # Inputs =====================================================================
 #
-# Cropped yearly <fname>_yearly.nc files written by 01a_crop_data under
-# PATH_OUTPUT_RAW_PREC / PATH_OUTPUT_RAW_EVAP.
+# Cropped yearly NetCDFs written by 01a_crop_data under PATH_OUTPUT_INPUT, kept
+# under their original Zenodo filenames. Evaporation files carry the "_e_"
+# variable marker; the remaining files are precipitation.
 
-prec_datasets <- filter_datasets(
-  var = "precip",
-  tstep = "yearly",
-  area = "land"
+input_files <- list.files(
+  PATH_OUTPUT_INPUT,
+  pattern = "\\.nc$",
+  full.names = TRUE
 )
 
-prec_names_ensemble <- prec_datasets[name %in% PREC_ENSEMBLE_NAMES_SHORT]$fname
-prec_names_analysis <- prec_datasets[name %in% PREC_NAMES_SHORT]$fname
-
-prec_datasets_used <- build_dataset_table(
-  datasets = prec_datasets,
-  names_analysis = prec_names_analysis,
-  names_ensemble = prec_names_ensemble,
-  path_out = PATH_OUTPUT_RAW_PREC
-)
-
-evap_datasets <- filter_datasets(
-  var = "evap",
-  var2 = "e",
-  tstep = "yearly",
-  area = "land"
-)
-
-evap_names_ensemble <- evap_datasets[name %in% EVAP_ENSEMBLE_NAMES_SHORT]$fname
-evap_names_analysis <- evap_datasets[name %in% EVAP_NAMES_SHORT]$fname
-
-evap_datasets_used <- build_dataset_table(
-  datasets = evap_datasets,
-  names_analysis = evap_names_analysis,
-  names_ensemble = evap_names_ensemble,
-  path_out = PATH_OUTPUT_RAW_EVAP
-)
-
-## Check that every cropped input exists before reading it.
-cropped_files <- c(prec_datasets_used$file, evap_datasets_used$file)
-missing_files <- cropped_files[!file.exists(cropped_files)]
-
-if (length(missing_files) > 0) {
+if (length(input_files) == 0) {
   stop(
-    "Missing cropped input files (run 01a_crop_data first):\n",
-    paste(missing_files, collapse = "\n"),
+    "No cropped .nc files found in ", PATH_OUTPUT_INPUT,
+    "\nRun 01a_crop_data first.",
+    call. = FALSE
+  )
+}
+
+evap_files <- input_files[grepl("_e_", basename(input_files), fixed = TRUE)]
+prec_files <- setdiff(input_files, evap_files)
+
+prec_datasets_used <- build_input_table(prec_files)
+evap_datasets_used <- build_input_table(evap_files)
+
+## Fail if any file could not be mapped to a short dataset name.
+unresolved <- rbind(prec_datasets_used, evap_datasets_used)[is.na(name)]$file
+
+if (length(unresolved) > 0) {
+  stop(
+    "Could not map these input files to a dataset name:\n",
+    paste(unresolved, collapse = "\n"),
     call. = FALSE
   )
 }
@@ -213,27 +226,27 @@ setorder(
 
 write_fst(
   prec_evap_raw,
-  file.path(PATH_OUTPUT_RAW, "prec_evap_raw.fst")
+  file.path(PATH_OUTPUT_OUTPUT, "prec_evap_raw.fst")
 )
 
 saveRDS(
   complete_grids,
-  file.path(PATH_OUTPUT_DATA, "twc_complete_grid.Rds")
+  file.path(PATH_OUTPUT_OUTPUT, "twc_complete_grid.Rds")
 )
 
 saveRDS(
   prec_evap,
-  file.path(PATH_OUTPUT_DATA, "prec_evap.Rds")
+  file.path(PATH_OUTPUT_OUTPUT, "prec_evap.Rds")
 )
 
 #saveRDS(
 #  prec_datasets_used,
-#  file.path(PATH_OUTPUT_DATA, "prec_datasets_used.Rds")
+#  file.path(PATH_OUTPUT_OUTPUT, "prec_datasets_used.Rds")
 #)
 
 #saveRDS(
 #  evap_datasets_used,
-#  file.path(PATH_OUTPUT_DATA, "evap_datasets_used.Rds")
+#  file.path(PATH_OUTPUT_OUTPUT, "evap_datasets_used.Rds")
 #)
 
 # Validation =================================================================

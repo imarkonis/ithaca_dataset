@@ -14,7 +14,7 @@ source("code/_source.R")
 library(parallel)
 
 prec_evap <- readRDS(
-  file.path(PATH_OUTPUT_DATA, "prec_evap.Rds")
+  file.path(PATH_OUTPUT_OUTPUT, "prec_evap.Rds")
 )
 
 weights_rb <- readRDS(

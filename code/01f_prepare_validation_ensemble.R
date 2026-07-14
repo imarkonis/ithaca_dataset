@@ -22,7 +22,7 @@ library(parallel)
 library(trend)
 
 prec_evap_raw <- read_fst(
-  file.path(PATH_OUTPUT_RAW, "prec_evap_raw.fst"),
+  file.path(PATH_OUTPUT_OUTPUT, "prec_evap_raw.fst"),
   as.data.table = TRUE
 )
 

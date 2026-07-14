@@ -15,7 +15,7 @@ source("code/_source.R")
 # Inputs ======================================================================
 
 prec_evap <- readRDS(
-  file.path(PATH_OUTPUT_DATA, "prec_evap.Rds")
+  file.path(PATH_OUTPUT_OUTPUT, "prec_evap.Rds")
 )
 
 twc_grid_classes <- readRDS(

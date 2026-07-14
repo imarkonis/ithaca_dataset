@@ -24,7 +24,7 @@ library(pRecipe)
 masks <- pRecipe_masks()
 
 twc_grid <- readRDS(
-  file.path(PATH_OUTPUT_DATA, "twc_complete_grid.Rds")
+  file.path(PATH_OUTPUT_OUTPUT, "twc_complete_grid.Rds")
 )
 
 # Constants ===================================================================
