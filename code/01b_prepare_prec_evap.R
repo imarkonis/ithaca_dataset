@@ -1,10 +1,10 @@
 # ============================================================================
-# Prepare and widen the raw yearly precipitation and evaporation datasets for
-# the TWC change workflow.
+# Prepare and widen the cropped yearly precipitation and evaporation datasets
+# for the TWC change workflow.
 #
-# This script subsets the selected gridded precipitation and evaporation
-# datasets to 1982-2021, converts them to tabular format, and builds a combined
-# raw long table (saved as prec_evap_raw.fst). It then keeps only the selected
+# This script reads the cropped yearly land datasets produced by
+# 01a_crop_data, converts them to tabular format, and builds a combined raw
+# long table (saved as prec_evap_raw.fst). It then keeps only the selected
 # analysis datasets, applies the intended MSWEP-GLEAM pairing, reshapes to wide
 # format, and saves the combined precipitation-evaporation table
 # (prec_evap.Rds).
@@ -18,11 +18,6 @@ source("code/_source.R")
 
 library(lubridate)
 library(pRecipe)
-library(doParallel)
-
-# Parallel setup ==============================================================
-
-registerDoParallel(max(N_DATASETS_PREC, N_DATASETS_EVAP))
 
 # Functions ==================================================================
 
@@ -32,27 +27,10 @@ build_dataset_table <- function(datasets, names_analysis, names_ensemble, path_o
   datasets_used <- datasets[fname %in% names_used, .(
     name,
     fname,
-    file_raw = file,
     file = file.path(path_out, paste0(fname, "_yearly.nc"))
   )]
 
   return(datasets_used[])
-}
-
-subset_and_save_dataset_files <- function(datasets_used, period) {
-  foreach(
-    dataset_count = seq_len(nrow(datasets_used)),
-    .packages = c("raster", "pRecipe", "lubridate")
-  ) %dopar% {
-    result <- subset_data(
-      datasets_used$file_raw[dataset_count],
-      yrs = period
-    )
-
-    saveNC(result, datasets_used$file[dataset_count])
-  }
-
-  invisible(NULL)
 }
 
 grid_files_to_dt <- function(datasets_used, variable_name) {
@@ -92,9 +70,10 @@ plot_mean_maps <- function(dt_plot, var_name) {
     )
 }
 
-# Prepare raw long table =====================================================
-
-## Precipitation ==============================================================
+# Inputs =====================================================================
+#
+# Cropped yearly <fname>_yearly.nc files written by 01a_crop_data under
+# PATH_OUTPUT_RAW_PREC / PATH_OUTPUT_RAW_EVAP.
 
 prec_datasets <- filter_datasets(
   var = "precip",
@@ -111,18 +90,6 @@ prec_datasets_used <- build_dataset_table(
   names_ensemble = prec_names_ensemble,
   path_out = PATH_OUTPUT_RAW_PREC
 )
-
-subset_and_save_dataset_files(
-  datasets_used = prec_datasets_used,
-  period = FULL_PERIOD
-)
-
-prec_dt <- grid_files_to_dt(
-  datasets_used = prec_datasets_used,
-  variable_name = "prec"
-)
-
-## Evaporation ================================================================
 
 evap_datasets <- filter_datasets(
   var = "evap",
@@ -141,17 +108,29 @@ evap_datasets_used <- build_dataset_table(
   path_out = PATH_OUTPUT_RAW_EVAP
 )
 
-subset_and_save_dataset_files(
-  datasets_used = evap_datasets_used,
-  period = FULL_PERIOD
+## Check that every cropped input exists before reading it.
+cropped_files <- c(prec_datasets_used$file, evap_datasets_used$file)
+missing_files <- cropped_files[!file.exists(cropped_files)]
+
+if (length(missing_files) > 0) {
+  stop(
+    "Missing cropped input files (run 01a_crop_data first):\n",
+    paste(missing_files, collapse = "\n"),
+    call. = FALSE
+  )
+}
+
+# Prepare raw long table =====================================================
+
+prec_dt <- grid_files_to_dt(
+  datasets_used = prec_datasets_used,
+  variable_name = "prec"
 )
 
 evap_dt <- grid_files_to_dt(
   datasets_used = evap_datasets_used,
   variable_name = "evap"
 )
-
-## Merging ===================================================================
 
 prec_evap_raw <- rbindlist(
   list(prec_dt, evap_dt),
