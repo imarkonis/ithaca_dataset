@@ -25,7 +25,7 @@ pet_raw <- read_fst(
 
 twc_grid <- readRDS(
   file.path(
-    PATH_OUTPUT_DATA,
+    PATH_OUTPUT_OUTPUT,
     "twc_complete_grid.Rds"
   )
 )
