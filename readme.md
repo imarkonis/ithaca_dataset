@@ -30,10 +30,7 @@ This avoids fragmented communication and keeps the dataset paper reproducible.
 projects/twc_dataset/
   README.md
   code/
-    dev/
       active scripts and reproducibility workflow
-    stable/
-      final scripts ready for release
   docs/
     documents for internal communication
   manuscript/
