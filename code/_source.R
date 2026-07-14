@@ -1,7 +1,8 @@
 library(data.table)
 library(ggplot2)
 
-load("C:/Users/imark/ownCloud/Yannis/15_Data/R/ithaca_dataset/paths.Rdata") # Change this to the local path for saving the script output 
+load(file.path("C:/Users/markonis/Documents/Data/", # Change this to the local path for saving the script output 
+     'ithaca_dataset/paths.Rdata')) 
 
 # Datasets
 PREC_NAMES_SHORT <- c('ERA5L', "FLDAS", "MERRA", "TERRA", "MSWEP")

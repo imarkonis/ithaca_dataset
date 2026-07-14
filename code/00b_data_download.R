@@ -18,10 +18,6 @@ EVAP_ENSEMBLE_NAMES_SHORT_lcase <- c("bess", "era5-land", "etmonitor",
 
 evap_names_grep <- paste0(EVAP_ENSEMBLE_NAMES_SHORT_lcase, collapse = "|")
 
-## data location ----
-PATH_OUTPUT_RAW_PREC <- paste0(PATH_OUTPUT_RAW, "prec") 
-PATH_OUTPUT_RAW_EVAP <- paste0(PATH_OUTPUT_RAW, "evap") 
-
 # Download data ----
 options(timeout = max(600, getOption("timeout")))
 

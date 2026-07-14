@@ -8,7 +8,7 @@
 
 # Constants & Variables ======================================================
 
-PATH_SAVE <-  "C:/Users/imark/ownCloud/Yannis/15_Data/R/" # Change this to the local path for saving the script output 
+PATH_SAVE <-  "C:/Users/markonis/Documents/Data/" # Change this to the local path for saving the script output 
 
 if (!dir.exists(dirname(PATH_SAVE))) {
   stop("Parent folder '", dirname(PATH_SAVE), "' does not exist. ",
