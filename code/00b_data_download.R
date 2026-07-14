@@ -15,8 +15,8 @@ library(jsonlite)
 
 # Inputs =====================================================================
 
-PRECIP_RECORD_ID <- "14290970"
-EVAP_RECORD_ID <- "14622177"
+PRECIPE_RECORD_ID <- "14290970"
+EVAPORE_RECORD_ID <- "14622177"
 ITHACA_RECORD_ID <- "21353180"
 
 # Constants & Variables ======================================================
@@ -120,7 +120,7 @@ download_manifest_files <- function(manifest) {
 
 # Analysis ===================================================================
 
-precip_files <- get_zenodo_files(PRECIP_RECORD_ID)
+precip_files <- get_zenodo_files(PRECIPE_RECORD_ID)
 
 selected_files_prec <- precip_files[
   grepl("land", precip_files$key) &
@@ -128,7 +128,7 @@ selected_files_prec <- precip_files[
     grepl(PREC_NAMES_PATTERN, precip_files$key),
 ]
 
-evap_files <- get_zenodo_files(EVAP_RECORD_ID)
+evap_files <- get_zenodo_files(EVAPORE_RECORD_ID)
 
 selected_files_evap <- evap_files[
   grepl("land", evap_files$key) &
