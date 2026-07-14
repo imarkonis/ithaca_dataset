@@ -3,8 +3,8 @@
 #
 # Lists the raw yearly NetCDF files that 00b_data_download places in
 # PATH_OUTPUT_RAW_PREC / PATH_OUTPUT_RAW_EVAP, subsets each of them to
-# FULL_PERIOD (1982-2021), and writes the cropped file back in place for the
-# downstream preparation step (01b).
+# FULL_PERIOD (1982-2021), and saves the cropped files under PATH_OUTPUT_INPUT
+# for the downstream preparation step (01b). The raw files are left untouched.
 # ============================================================================
 
 # Libraries ==================================================================
@@ -48,15 +48,9 @@ if (length(raw_files) == 0) {
 
 # Functions ==================================================================
 
-crop_file_in_place <- function(file, period) {
+crop_and_save_file <- function(file, path_out, period) {
   result <- subset_data(file, yrs = period)
-
-  ## Write to a temporary file first, then replace, so the source NetCDF is
-  ## never truncated while it is still being read.
-  tmp_file <- file.path(dirname(file), paste0(".tmp_", basename(file)))
-  saveNC(result, tmp_file)
-  file.copy(tmp_file, file, overwrite = TRUE)
-  unlink(tmp_file)
+  saveNC(result, file.path(path_out, basename(file)))
 
   invisible(file)
 }
@@ -67,17 +61,18 @@ foreach(
   file_count = seq_along(raw_files),
   .packages = c("raster", "pRecipe", "lubridate")
 ) %dopar% {
-  crop_file_in_place(raw_files[file_count], FULL_PERIOD)
+  crop_and_save_file(raw_files[file_count], PATH_OUTPUT_INPUT, FULL_PERIOD)
 }
 
 # Outputs ====================================================================
 #
-# The cropped datasets replace the raw files in place under
-# PATH_OUTPUT_RAW_PREC / PATH_OUTPUT_RAW_EVAP.
+# One cropped NetCDF per raw dataset, written under PATH_OUTPUT_INPUT with the
+# original filename. The raw files remain untouched.
 
 # Validation =================================================================
 
-invalid_files <- raw_files[!file.exists(raw_files) | file.size(raw_files) == 0]
+cropped_files <- file.path(PATH_OUTPUT_INPUT, basename(raw_files))
+invalid_files <- cropped_files[!file.exists(cropped_files) | file.size(cropped_files) == 0]
 
 if (length(invalid_files) > 0) {
   stop(
@@ -90,5 +85,6 @@ if (length(invalid_files) > 0) {
 message(
   "Cropped ", length(raw_files), " datasets to ",
   FULL_PERIOD["START"], "-", FULL_PERIOD["END"],
-  " (", length(prec_files), " prec, ", length(evap_files), " evap)."
+  " (", length(prec_files), " prec, ", length(evap_files), " evap) into ",
+  PATH_OUTPUT_INPUT, "."
 )
