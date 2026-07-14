@@ -20,18 +20,10 @@ registerDoParallel(max(N_DATASETS_PREC, N_DATASETS_EVAP))
 
 # Inputs =====================================================================
 #
-# Raw yearly land datasets downloaded locally by 00b_data_download:
-#   * precipitation & evaporation collections obtained via pRecipe
-#     (located through filter_datasets()$file);
-#   * GPCC (v2022) obtained from the ITHACA Zenodo repository and stored as a
-#     stand-alone NetCDF under PATH_OUTPUT_RAW_PREC.
-
-# Constants & Variables ======================================================
-
-GPCC_RAW_FILE <- file.path(
-  PATH_OUTPUT_RAW_PREC,
-  "gpcc-v2022_tp_mm_land_198101_202012_025_yearly.nc"
-)
+# Raw yearly land datasets downloaded locally by 00b_data_download and located
+# through filter_datasets()$file. All precipitation files (GPCC included) live
+# under PATH_OUTPUT_RAW_PREC and all evaporation files under PATH_OUTPUT_RAW_EVAP,
+# so every dataset is handled the same way.
 
 # Functions ==================================================================
 
@@ -83,10 +75,6 @@ prec_datasets_used <- build_dataset_table(
   names_ensemble = prec_names_ensemble,
   path_out = PATH_OUTPUT_RAW_PREC
 )
-
-## GPCC is downloaded from Zenodo (not pRecipe), so point its raw input at the
-## local Zenodo file while keeping the pRecipe-based cropped output name.
-prec_datasets_used[name == "GPCC", file_raw := GPCC_RAW_FILE]
 
 ## Evaporation ===============================================================
 
