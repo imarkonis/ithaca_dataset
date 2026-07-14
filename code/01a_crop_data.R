@@ -11,7 +11,6 @@
 
 source("code/_source.R")
 
-library(pRecipe)
 library(doParallel)
 
 # Parallel setup =============================================================
@@ -19,9 +18,7 @@ library(doParallel)
 registerDoParallel(max(N_DATASETS_PREC, N_DATASETS_EVAP))
 
 # Inputs =====================================================================
-#
-# Every yearly NetCDF downloaded by 00b_data_download, discovered by listing the
-# raw precipitation and evaporation folders (Zenodo filenames are kept as-is).
+
 
 prec_files <- list.files(
   PATH_OUTPUT_RAW_PREC,
@@ -65,14 +62,11 @@ foreach(
 }
 
 # Outputs ====================================================================
-#
-# One cropped NetCDF per raw dataset, written under PATH_OUTPUT_INPUT with the
-# original filename. The raw files remain untouched.
-
-# Validation =================================================================
 
 cropped_files <- file.path(PATH_OUTPUT_INPUT, basename(raw_files))
 invalid_files <- cropped_files[!file.exists(cropped_files) | file.size(cropped_files) == 0]
+
+# Validation =================================================================
 
 if (length(invalid_files) > 0) {
   stop(
