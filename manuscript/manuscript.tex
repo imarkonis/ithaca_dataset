@@ -135,7 +135,9 @@ TEXT
 
 
 \introduction  %% \introduction[modified heading if necessary]
-Terrestrial water-cycle data are essential for our understanding of atmospheric and land-surface interactions as water circulates between them. Precipitation, evapotranspiration, and their balance, precipitation minus evapotranspiration (P-E), constitute the core of myriad research endeavors, from drought and flood assessment to water stress, food security,  and the attribution of water cycle responses to climate change. However, existing estimates of precipitation and evapotranspiration often vary significantly due to several factors, including the density of observational networks, data retrieval algorithms, model assumptions, bias-correction methods, point-to-grid transformations, and missing-data handling, among others. Even minor inconsistencies among precipitation, evapotranspiration, and, consequently, P-E, however small, may propagate into large differences in downstream analyses and even lead researchers into contradicting findings.
+Terrestrial water cycle data products for precipitation and evapotranspiration, the two major atmospheric fluxes constituting the main input and output of the terrestrial water cycle, are essential for the continuous advancement of our understanding of the processes driving water circulation within the land surface atmosphere nexus \citep{vargas_godoy_global_2021}, and to quantify the conditions under which hydrology, environmental, and social systems operate and evolve in response to climate change. Given that precipitation and evapotranspiration are the dominant fluxes that determine terrestrial water availability, their difference, precipitation minus evapotranspiration ($P-E$), provides a compact and widely used diagnostic metric of water surplus or deficit, linking atmospheric forcing to terrestrial storage, streamflow, and moisture constraints \citep{allan_advances_2020}. Therefore, robust, spatially coherent, and comprehensive global estimates of these variables are indispensable not only for hydroclimate analysis but also for benchmarking models, constraining water budgets, and supporting policy-making across scales.
+
+Despite their importance and the best efforts of the scientific community, terrestrial precipitation and evapotranspiration remain shrouded in uncertainty due to their intrinsic complexity as multiscale physical processes and practical limitations \citep{su_precipitation_2026}. Precipitation datasets are derived from manifold sources, including in situ gauges, satellites, reanalyses, and, most recently, merged products, each with distinct strengths and limitations related to spatial coverage, retrieval physics, temporal sampling, gauge undercatch artifacts, and orographic effects \citep{sun_review_2018}, which translate into unavoidable yet discordant bias-correction procedures. Evapotranspiration datasets, while similarly heterogeneous, are further complicated by the practical complexity of direct observations and the intertwining of evaporation and transpiration processes. The scarcity of in-situ evapotranspiration measurements forced us to rely on potential evapotranspiration-derived formulations, leading to substantial divergence among products in magnitude, variability, and long-term trends \citep{thakur_unveiling_2025}. As a result, users working in different regions or applications often face a practical but consequential problem: conclusions about terrestrial water availability, trend direction, or hydrological partitioning can depend strongly on the dataset selected, even when analyses are otherwise identical \citep{markonis_spatial_2024}.
 
 
 \section{HEADING}
@@ -212,21 +214,21 @@ TEXT
 
 %% The reference list is compiled as follows:
 
-\begin{thebibliography}{}
+% \begin{thebibliography}{}
 
-\bibitem[AUTHOR(YEAR)]{LABEL1}
-REFERENCE 1
+% \bibitem[AUTHOR(YEAR)]{LABEL1}
+% REFERENCE 1
 
-\bibitem[AUTHOR(YEAR)]{LABEL2}
-REFERENCE 2
+% \bibitem[AUTHOR(YEAR)]{LABEL2}
+% REFERENCE 2
 
-\end{thebibliography}
+% \end{thebibliography}
 
 %% Since the Copernicus LaTeX package includes the BibTeX style file copernicus.bst,
 %% authors experienced with BibTeX only have to include the following two lines:
 %%
-%% \bibliographystyle{copernicus}
-%% \bibliography{example.bib}
+\bibliographystyle{copernicus}
+\bibliography{manuscript/references}
 %%
 %% URLs and DOIs can be entered in your BibTeX file as:
 %%
