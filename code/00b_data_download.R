@@ -16,7 +16,7 @@ library(jsonlite)
 # Inputs =====================================================================
 
 PRECIPE_RECORD_ID <- "14290970"
-EVAPORE_RECORD_ID <- "14622177"
+EVAPORE_RECORD_ID <- "21369628"
 ITHACA_RECORD_ID <- "21353180"
 
 # Constants & Variables ======================================================
