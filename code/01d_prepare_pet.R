@@ -12,7 +12,6 @@
 
 source("code/_source.R")
 
-library(fst)
 library(lubridate)
 
 # Inputs =====================================================================
@@ -28,8 +27,6 @@ twc_grid <- readRDS(
 
 # Constants & Variables ======================================================
 
-# The TWC grid is used only as a spatial mask (avoids pulling grid metadata
-# into the PET method columns during melt()).
 twc_coordinates <- unique(twc_grid[, .(lon, lat)])
 
 # Analysis ===================================================================
@@ -81,9 +78,9 @@ write_fst(
   file.path(PATH_OUTPUT_DATA, "pet.fst")
 )
 
-saveRDS(
+write_fst(
   pet_mean,
-  file = file.path(PATH_OUTPUT_DATA, "pet_mean.Rds")
+  file.path(PATH_OUTPUT_DATA, "pet_mean.fst")
 )
 
 # Validation =================================================================
