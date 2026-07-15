@@ -15,7 +15,6 @@
 
 source("code/_source.R")
 
-library(parallel)
 library(trend)
 
 # Inputs =====================================================================
@@ -29,16 +28,6 @@ prec_evap_raw <- read_fst(
 
 P_VALUE_THRESHOLD <- 0.1
 MIN_YEARS_FOR_TREND <- diff(FULL_PERIOD) - 4
-
-N_WORKERS <- as.integer(
-  Sys.getenv(
-    "TWC_N_WORKERS",
-    unset = max(1L, parallel::detectCores() - 2L)
-  )
-)
-
-# Avoid oversubscription: forked workers should not also use many DT threads.
-data.table::setDTthreads(1L)
 
 # Functions ==================================================================
 
@@ -77,8 +66,6 @@ validate_dataset_names <- function(dt, variable_name, dataset_names, label) {
 }
 
 estimate_single_dataset_diagnostics <- function(dt, dataset_name) {
-  data.table::setDTthreads(1L)
-
   dt_use <- copy(dt[dataset == dataset_name])
   if ("variable" %in% names(dt_use)) dt_use[, variable := NULL]
   setorder(dt_use, lon, lat, year)
@@ -140,19 +127,14 @@ estimate_single_dataset_diagnostics <- function(dt, dataset_name) {
   )
 }
 
-estimate_dataset_diagnostics <- function(dt, dataset_names, n_workers = N_WORKERS) {
-  message(
-    "Estimating diagnostics for ", length(dataset_names),
-    " datasets using ", n_workers, " workers."
-  )
+estimate_dataset_diagnostics <- function(dt, dataset_names) {
+  message("Estimating diagnostics for ", length(dataset_names), " datasets.")
 
-  diagnostic_list <- parallel::mclapply(
+  diagnostic_list <- lapply(
     dataset_names,
     function(dataset_name) {
       estimate_single_dataset_diagnostics(dt = dt, dataset_name = dataset_name)
-    },
-    mc.cores = min(n_workers, length(dataset_names)),
-    mc.preschedule = TRUE
+    }
   )
 
   dataset_stats <- rbindlist(
@@ -247,20 +229,14 @@ estimate_candidate_reference_stats <- function(
     dataset_slopes,
     ensemble_names,
     candidate_names,
-    variable_name,
-    n_workers = N_WORKERS
+    variable_name
 ) {
-  message(
-    "Estimating candidate references for ", variable_name,
-    " using ", min(n_workers, length(candidate_names)), " workers."
-  )
+  message("Estimating candidate references for ", variable_name, ".")
 
   candidate_reference_stats <- rbindlist(
-    parallel::mclapply(
+    lapply(
       candidate_names,
       function(candidate_name) {
-        data.table::setDTthreads(1L)
-
         reference_names <- get_reference_dataset_names(
           ensemble_names = ensemble_names,
           candidate_name = candidate_name
@@ -285,9 +261,7 @@ estimate_candidate_reference_stats <- function(
         ]
 
         reference_stats
-      },
-      mc.cores = min(n_workers, length(candidate_names)),
-      mc.preschedule = TRUE
+      }
     ),
     fill = TRUE
   )
@@ -315,10 +289,10 @@ estimate_candidate_reference_stats <- function(
 
 # Orchestrator: dataset diagnostics -> leave-one-out candidate reference stats.
 estimate_ensemble_products <- function(
-    dt, variable_name, ensemble_names, candidate_names, n_workers = N_WORKERS
+    dt, variable_name, ensemble_names, candidate_names
 ) {
   diagnostics <- estimate_dataset_diagnostics(
-    dt = dt, dataset_names = ensemble_names, n_workers = n_workers
+    dt = dt, dataset_names = ensemble_names
   )
 
   candidate_reference_stats <- estimate_candidate_reference_stats(
@@ -326,8 +300,7 @@ estimate_ensemble_products <- function(
     dataset_slopes = diagnostics$dataset_slopes,
     ensemble_names = ensemble_names,
     candidate_names = candidate_names,
-    variable_name = variable_name,
-    n_workers = n_workers
+    variable_name = variable_name
   )
 
   list(
@@ -505,22 +478,19 @@ validate_dataset_names(
 message("Precipitation ensemble: ", paste(PREC_ENSEMBLE_NAMES_SHORT, collapse = ", "))
 message("Evaporation ensemble: ", paste(EVAP_ENSEMBLE_NAMES_SHORT, collapse = ", "))
 message("Analysis candidates: ", paste(EVAP_NAMES_SHORT, collapse = ", "))
-message("Using workers: ", N_WORKERS)
 
 prec_ensemble <- estimate_ensemble_products(
   dt = prec_evap_raw[variable == "prec"],
   variable_name = "prec",
   ensemble_names = PREC_ENSEMBLE_NAMES_SHORT,
-  candidate_names = EVAP_NAMES_SHORT,
-  n_workers = N_WORKERS
+  candidate_names = EVAP_NAMES_SHORT
 )
 
 evap_ensemble <- estimate_ensemble_products(
   dt = prec_evap_raw[variable == "evap"],
   variable_name = "evap",
   ensemble_names = EVAP_ENSEMBLE_NAMES_SHORT,
-  candidate_names = EVAP_NAMES_SHORT,
-  n_workers = N_WORKERS
+  candidate_names = EVAP_NAMES_SHORT
 )
 
 prec_candidate_reference_values <- prepare_candidate_reference_values(
