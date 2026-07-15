@@ -19,7 +19,6 @@
 
 source("code/_source.R")
 
-library(fst)
 library(raster)
 
 # Inputs =====================================================================

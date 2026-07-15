@@ -1,7 +1,8 @@
 library(data.table)
 library(ggplot2)
+library(fst)
 
-load(file.path("C:/Users/markonis/Documents/Data/", # Change this to the local path for saving the script output 
+load(file.path("D:/research", # Change this to the local path for saving the script output 
      'ithaca_dataset/paths.Rdata')) 
 
 # Datasets
