@@ -1,33 +1,32 @@
 # ============================================================================
-# Estimate ensemble reference statistics for precipitation and evaporation
+# Estimate candidate-specific leave-out reference statistics for
+# precipitation and evaporation.
 #
 # This script:
-#   1) uses the full 8 member precipitation and evaporation ensembles
-#   2) estimates per dataset grid cell means and standard deviations
-#   3) estimates Sen slopes and Mann Kendall p values per dataset and grid cell
-#   4) computes full 8 member ensemble statistics
-#   5) computes candidate specific reference statistics for the analysis datasets
-#   6) removes the candidate dataset from the reference ensemble when present
-#   7) keeps the full reference ensemble when the candidate is absent
-#   8) saves raw ensemble datasets, slopes, full statistics, and candidate
-#      reference statistics
+#   1) uses the full 8-member precipitation and evaporation ensembles
+#   2) estimates per dataset grid-cell means, SDs, and Sen slopes / MK p-values
+#   3) builds, for each analysis candidate, a leave-one-out reference ensemble
+#      (the candidate is removed from the reference when present, kept when not)
+#   4) attaches each candidate's own cell values to its reference statistics
+#   5) saves the two candidate-reference tables consumed by 03a_dataset_ranking
 # ============================================================================
 
-
-# Inputs ======================================================================
+# Libraries ==================================================================
 
 source("code/_source.R")
 
+library(fst)
 library(parallel)
 library(trend)
+
+# Inputs =====================================================================
 
 prec_evap_raw <- read_fst(
   file.path(PATH_OUTPUT_OUTPUT, "prec_evap_raw.fst"),
   as.data.table = TRUE
 )
 
-
-# Constants & Variables =======================================================
+# Constants & Variables ======================================================
 
 P_VALUE_THRESHOLD <- 0.1
 MIN_YEARS_FOR_TREND <- diff(FULL_PERIOD) - 4
@@ -39,48 +38,34 @@ N_WORKERS <- as.integer(
   )
 )
 
-# Avoid oversubscription. Each forked worker should not also use many
-# data.table threads.
+# Avoid oversubscription: forked workers should not also use many DT threads.
 data.table::setDTthreads(1L)
 
-
-# Functions ===================================================================
+# Functions ==================================================================
 
 safe_median <- function(x) {
   x <- x[is.finite(x)]
-  
-  if (length(x) == 0) {
-    return(NA_real_)
-  }
-  
+  if (length(x) == 0) return(NA_real_)
   median(x)
 }
 
-
 safe_iqr <- function(x) {
   x <- x[is.finite(x)]
-  
-  if (length(x) == 0) {
-    return(NA_real_)
-  }
-  
+  if (length(x) == 0) return(NA_real_)
   as.numeric(IQR(x))
 }
-
 
 get_reference_dataset_names <- function(ensemble_names, candidate_name) {
   if (candidate_name %in% ensemble_names) {
     return(setdiff(ensemble_names, candidate_name))
   }
-  
   ensemble_names
 }
-
 
 validate_dataset_names <- function(dt, variable_name, dataset_names, label) {
   available_names <- unique(dt[variable == variable_name, dataset])
   missing_names <- setdiff(dataset_names, available_names)
-  
+
   if (length(missing_names) > 0) {
     stop(
       paste0(
@@ -89,22 +74,16 @@ validate_dataset_names <- function(dt, variable_name, dataset_names, label) {
       )
     )
   }
-  
   invisible(TRUE)
 }
 
-
 estimate_single_dataset_diagnostics <- function(dt, dataset_name) {
   data.table::setDTthreads(1L)
-  
+
   dt_use <- copy(dt[dataset == dataset_name])
-  
-  if ("variable" %in% names(dt_use)) {
-    dt_use[, variable := NULL]
-  }
-  
+  if ("variable" %in% names(dt_use)) dt_use[, variable := NULL]
   setorder(dt_use, lon, lat, year)
-  
+
   dataset_stats <- dt_use[
     ,
     .(
@@ -114,29 +93,23 @@ estimate_single_dataset_diagnostics <- function(dt, dataset_name) {
     ),
     by = .(lon, lat)
   ]
-  
-  dataset_stats[
-    ,
-    dataset := dataset_name
-  ]
-  
+  dataset_stats[, dataset := dataset_name]
   setcolorder(
     dataset_stats,
-    c("lon", "lat", "dataset", setdiff(names(dataset_stats), c("lon", "lat", "dataset")))
+    c("lon", "lat", "dataset",
+      setdiff(names(dataset_stats), c("lon", "lat", "dataset")))
   )
-  
+
   dataset_slopes <- dt_use[
     ,
     {
       value_valid <- value[is.finite(value)]
-      
       if (
         length(value_valid) >= MIN_YEARS_FOR_TREND &&
         length(unique(value_valid)) > 1
       ) {
         sen_result <- trend::sens.slope(x = value_valid)
         mk_result <- trend::mk.test(x = value_valid)
-        
         list(
           sen_slope = as.numeric(sen_result$estimates),
           p_value = mk_result$p.value,
@@ -152,87 +125,56 @@ estimate_single_dataset_diagnostics <- function(dt, dataset_name) {
     },
     by = .(lon, lat)
   ]
-  
-  dataset_slopes[
-    ,
-    dataset := dataset_name
-  ]
-  
+  dataset_slopes[, dataset := dataset_name]
   setcolorder(
     dataset_slopes,
-    c("lon", "lat", "dataset", setdiff(names(dataset_slopes), c("lon", "lat", "dataset")))
+    c("lon", "lat", "dataset",
+      setdiff(names(dataset_slopes), c("lon", "lat", "dataset")))
   )
-  
-  setorder(dt_use, dataset, lon, lat, year)
+
   setorder(dataset_stats, dataset, lon, lat)
   setorder(dataset_slopes, dataset, lon, lat)
-  
+
   list(
-    datasets = dt_use,
     dataset_stats = dataset_stats,
     dataset_slopes = dataset_slopes
   )
 }
 
-
 estimate_dataset_diagnostics <- function(dt, dataset_names, n_workers = N_WORKERS) {
-  dt_use <- copy(dt[dataset %in% dataset_names])
-  
-  if ("variable" %in% names(dt_use)) {
-    dt_use[, variable := NULL]
-  }
-  
-  setorder(dt_use, dataset, lon, lat, year)
-  
   message(
-    "Estimating diagnostics for ",
-    length(dataset_names),
-    " datasets using ",
-    n_workers,
-    " workers."
+    "Estimating diagnostics for ", length(dataset_names),
+    " datasets using ", n_workers, " workers."
   )
-  
+
   diagnostic_list <- parallel::mclapply(
     dataset_names,
     function(dataset_name) {
-      estimate_single_dataset_diagnostics(
-        dt = dt,
-        dataset_name = dataset_name
-      )
+      estimate_single_dataset_diagnostics(dt = dt, dataset_name = dataset_name)
     },
     mc.cores = min(n_workers, length(dataset_names)),
     mc.preschedule = TRUE
   )
-  
+
   dataset_stats <- rbindlist(
     lapply(diagnostic_list, `[[`, "dataset_stats"),
-    use.names = TRUE,
-    fill = TRUE
+    use.names = TRUE, fill = TRUE
   )
-  
   dataset_slopes <- rbindlist(
     lapply(diagnostic_list, `[[`, "dataset_slopes"),
-    use.names = TRUE,
-    fill = TRUE
+    use.names = TRUE, fill = TRUE
   )
-  
+
   setorder(dataset_stats, dataset, lon, lat)
   setorder(dataset_slopes, dataset, lon, lat)
-  
+
   list(
-    datasets = dt_use,
     dataset_stats = dataset_stats,
     dataset_slopes = dataset_slopes
   )
 }
 
-
-estimate_ensemble_summary <- function(
-    dataset_stats,
-    dataset_slopes,
-    dataset_names
-) {
-  
+estimate_ensemble_summary <- function(dataset_stats, dataset_slopes, dataset_names) {
   ensemble_stats <- dataset_stats[
     dataset %in% dataset_names,
     .(
@@ -244,7 +186,7 @@ estimate_ensemble_summary <- function(
     ),
     by = .(lon, lat)
   ]
-  
+
   ensemble_slopes <- dataset_slopes[
     dataset %in% dataset_names,
     .(
@@ -254,19 +196,11 @@ estimate_ensemble_summary <- function(
     ),
     by = .(lon, lat)
   ]
-  
+
   slope_summary <- copy(dataset_slopes[dataset %in% dataset_names])
-  
-  slope_summary[
-    ,
-    significant := is.finite(p_value) & p_value < P_VALUE_THRESHOLD
-  ]
-  
-  slope_summary[
-    ,
-    slope_sign := sign(sen_slope)
-  ]
-  
+  slope_summary[, significant := is.finite(p_value) & p_value < P_VALUE_THRESHOLD]
+  slope_summary[, slope_sign := sign(sen_slope)]
+
   agreement_summary <- slope_summary[
     ,
     .(
@@ -278,50 +212,36 @@ estimate_ensemble_summary <- function(
     ),
     by = .(lon, lat)
   ]
-  
+
   agreement_summary[
     ,
     majority_significant := n_significant > floor(length(dataset_names) / 2)
   ]
-  
   agreement_summary[
     ,
     majority_agrees := majority_significant == TRUE &
       pmax(n_pos, n_neg) > floor(n_significant / 2)
   ]
-  
   agreement_summary[
     ,
     majority_sign := fifelse(
-      n_pos > n_neg,
-      1L,
-      fifelse(
-        n_neg > n_pos,
-        -1L,
-        0L
-      )
+      n_pos > n_neg, 1L,
+      fifelse(n_neg > n_pos, -1L, 0L)
     )
   ]
-  
+
   ensemble_summary <- merge(
-    ensemble_stats,
-    ensemble_slopes,
-    by = c("lon", "lat"),
-    all = TRUE
+    ensemble_stats, ensemble_slopes,
+    by = c("lon", "lat"), all = TRUE
   )
-  
   ensemble_summary <- merge(
-    ensemble_summary,
-    agreement_summary,
-    by = c("lon", "lat"),
-    all = TRUE
+    ensemble_summary, agreement_summary,
+    by = c("lon", "lat"), all = TRUE
   )
-  
+
   setorder(ensemble_summary, lon, lat)
-  
   ensemble_summary
 }
-
 
 estimate_candidate_reference_stats <- function(
     dataset_stats,
@@ -331,32 +251,28 @@ estimate_candidate_reference_stats <- function(
     variable_name,
     n_workers = N_WORKERS
 ) {
-  
   message(
-    "Estimating candidate references for ",
-    variable_name,
-    " using ",
-    min(n_workers, length(candidate_names)),
-    " workers."
+    "Estimating candidate references for ", variable_name,
+    " using ", min(n_workers, length(candidate_names)), " workers."
   )
-  
+
   candidate_reference_stats <- rbindlist(
     parallel::mclapply(
       candidate_names,
       function(candidate_name) {
         data.table::setDTthreads(1L)
-        
+
         reference_names <- get_reference_dataset_names(
           ensemble_names = ensemble_names,
           candidate_name = candidate_name
         )
-        
+
         reference_stats <- estimate_ensemble_summary(
           dataset_stats = dataset_stats,
           dataset_slopes = dataset_slopes,
           dataset_names = reference_names
         )
-        
+
         reference_stats[
           ,
           `:=`(
@@ -368,7 +284,7 @@ estimate_candidate_reference_stats <- function(
             reference_names = paste(reference_names, collapse = ";")
           )
         ]
-        
+
         reference_stats
       },
       mc.cores = min(n_workers, length(candidate_names)),
@@ -376,86 +292,36 @@ estimate_candidate_reference_stats <- function(
     ),
     fill = TRUE
   )
-  
+
   setnames(
     candidate_reference_stats,
-    old = c(
-      "ens_median",
-      "ens_mean_iqr",
-      "ens_sd",
-      "ens_sd_iqr",
-      "ens_slope_median",
-      "ens_slope_iqr"
-    ),
-    new = c(
-      "ref_mean_median",
-      "ref_mean_iqr",
-      "ref_sd_median",
-      "ref_sd_iqr",
-      "ref_slope_median",
-      "ref_slope_iqr"
-    )
+    old = c("ens_median", "ens_mean_iqr", "ens_sd", "ens_sd_iqr",
+            "ens_slope_median", "ens_slope_iqr"),
+    new = c("ref_mean_median", "ref_mean_iqr", "ref_sd_median", "ref_sd_iqr",
+            "ref_slope_median", "ref_slope_iqr")
   )
-  
+
+  lead_cols <- c(
+    "variable", "candidate_dataset", "candidate_present_in_variable",
+    "candidate_removed_from_reference", "reference_n_datasets", "reference_names"
+  )
   setcolorder(
     candidate_reference_stats,
-    c(
-      "variable",
-      "candidate_dataset",
-      "candidate_present_in_variable",
-      "candidate_removed_from_reference",
-      "reference_n_datasets",
-      "reference_names",
-      setdiff(
-        names(candidate_reference_stats),
-        c(
-          "variable",
-          "candidate_dataset",
-          "candidate_present_in_variable",
-          "candidate_removed_from_reference",
-          "reference_n_datasets",
-          "reference_names"
-        )
-      )
-    )
+    c(lead_cols, setdiff(names(candidate_reference_stats), lead_cols))
   )
-  
+
   setorder(candidate_reference_stats, candidate_dataset, lon, lat)
-  
   candidate_reference_stats
 }
 
-
+# Orchestrator: dataset diagnostics -> leave-one-out candidate reference stats.
 estimate_ensemble_products <- function(
-    dt,
-    variable_name,
-    ensemble_names,
-    candidate_names,
-    n_workers = N_WORKERS
+    dt, variable_name, ensemble_names, candidate_names, n_workers = N_WORKERS
 ) {
-  
   diagnostics <- estimate_dataset_diagnostics(
-    dt = dt,
-    dataset_names = ensemble_names,
-    n_workers = n_workers
+    dt = dt, dataset_names = ensemble_names, n_workers = n_workers
   )
-  
-  full_ensemble_stats <- estimate_ensemble_summary(
-    dataset_stats = diagnostics$dataset_stats,
-    dataset_slopes = diagnostics$dataset_slopes,
-    dataset_names = ensemble_names
-  )
-  
-  full_ensemble_stats[
-    ,
-    `:=`(
-      variable = variable_name,
-      reference_type = "full_variable_ensemble",
-      reference_n_datasets = length(ensemble_names),
-      reference_names = paste(ensemble_names, collapse = ";")
-    )
-  ]
-  
+
   candidate_reference_stats <- estimate_candidate_reference_stats(
     dataset_stats = diagnostics$dataset_stats,
     dataset_slopes = diagnostics$dataset_slopes,
@@ -464,162 +330,12 @@ estimate_ensemble_products <- function(
     variable_name = variable_name,
     n_workers = n_workers
   )
-  
+
   list(
-    datasets = diagnostics$datasets,
     dataset_stats = diagnostics$dataset_stats,
     slopes = diagnostics$dataset_slopes,
-    stats = full_ensemble_stats,
     candidate_reference_stats = candidate_reference_stats
   )
-}
-
-prepare_candidate_reference_values <- function(
-    candidate_reference_stats,
-    dataset_stats,
-    raw_dt,
-    variable_name,
-    candidate_names,
-    candidate_value_overrides = NULL
-) {
-  
-  reference_use <- candidate_reference_stats[
-    ,
-    .(
-      candidate_dataset,
-      lon,
-      lat,
-      ref_mean_median,
-      ref_mean_iqr,
-      ref_sd_median,
-      ref_sd_iqr,
-      ref_slope_median,
-      ref_slope_iqr,
-      n_significant,
-      n_pos,
-      n_neg,
-      majority_significant,
-      majority_agrees,
-      majority_sign
-    )
-  ]
-  
-  candidate_map <- data.table(
-    candidate_dataset = candidate_names,
-    candidate_value_dataset = candidate_names
-  )
-  
-  if (!is.null(candidate_value_overrides)) {
-    override_dt <- data.table(
-      candidate_dataset = names(candidate_value_overrides),
-      candidate_value_dataset = as.character(candidate_value_overrides)
-    )
-    
-    candidate_map[
-      override_dt,
-      candidate_value_dataset := i.candidate_value_dataset,
-      on = "candidate_dataset"
-    ]
-  }
-  
-  candidate_values_from_stats <- merge(
-    candidate_map,
-    dataset_stats[
-      ,
-      .(
-        candidate_value_dataset = dataset,
-        lon,
-        lat,
-        candidate_mean = dataset_mean,
-        candidate_sd = dataset_sd,
-        candidate_n_years = n_years_mean
-      )
-    ],
-    by = "candidate_value_dataset",
-    allow.cartesian = TRUE
-  )
-  
-  missing_value_datasets <- setdiff(
-    candidate_map$candidate_value_dataset,
-    unique(dataset_stats$dataset)
-  )
-  
-  if (length(missing_value_datasets) > 0) {
-    
-    candidate_values_from_raw <- merge(
-      candidate_map[
-        candidate_value_dataset %in% missing_value_datasets
-      ],
-      raw_dt[
-        variable == variable_name &
-          dataset %in% missing_value_datasets,
-        .(
-          candidate_value_dataset = dataset,
-          lon,
-          lat,
-          candidate_mean = mean(value, na.rm = TRUE),
-          candidate_sd = sd(value, na.rm = TRUE),
-          candidate_n_years = sum(is.finite(value))
-        ),
-        by = .(dataset, lon, lat)
-      ][
-        ,
-        dataset := NULL
-      ],
-      by = "candidate_value_dataset",
-      allow.cartesian = TRUE
-    )
-    
-    candidate_cell_means <- rbindlist(
-      list(
-        candidate_values_from_stats,
-        candidate_values_from_raw
-      ),
-      use.names = TRUE,
-      fill = TRUE
-    )
-    
-  } else {
-    
-    candidate_cell_means <- candidate_values_from_stats
-    
-  }
-  
-  candidate_reference_values <- merge(
-    candidate_cell_means,
-    reference_use,
-    by = c("candidate_dataset", "lon", "lat"),
-    all.x = TRUE
-  )
-  
-  setcolorder(
-    candidate_reference_values,
-    c(
-      "candidate_dataset",
-      "candidate_value_dataset",
-      "lon",
-      "lat",
-      "candidate_mean",
-      "candidate_sd",
-      "candidate_n_years",
-      "ref_mean_median",
-      "ref_mean_iqr",
-      "ref_sd_median",
-      "ref_sd_iqr",
-      "ref_slope_median",
-      "ref_slope_iqr",
-      "n_significant",
-      "n_pos",
-      "n_neg",
-      "majority_significant",
-      "majority_agrees",
-      "majority_sign"
-    )
-  )
-  
-  setorder(candidate_reference_values, candidate_dataset, lon, lat)
-  
-  candidate_reference_values
 }
 
 prepare_candidate_reference_values <- function(
@@ -631,55 +347,42 @@ prepare_candidate_reference_values <- function(
     candidate_names,
     candidate_value_overrides = NULL
 ) {
-  
   reference_use <- candidate_reference_stats[
     ,
     .(
-      candidate_dataset,
-      lon,
-      lat,
-      ref_mean_median,
-      ref_mean_iqr,
-      ref_sd_median,
-      ref_sd_iqr,
-      ref_slope_median,
-      ref_slope_iqr,
-      n_significant,
-      n_pos,
-      n_neg,
-      majority_significant,
-      majority_agrees,
-      majority_sign
+      candidate_dataset, lon, lat,
+      ref_mean_median, ref_mean_iqr,
+      ref_sd_median, ref_sd_iqr,
+      ref_slope_median, ref_slope_iqr,
+      n_significant, n_pos, n_neg,
+      majority_significant, majority_agrees, majority_sign
     )
   ]
-  
+
   candidate_map <- data.table(
     candidate_dataset = candidate_names,
     candidate_value_dataset = candidate_names
   )
-  
+
   if (!is.null(candidate_value_overrides)) {
     override_dt <- data.table(
       candidate_dataset = names(candidate_value_overrides),
       candidate_value_dataset = as.character(candidate_value_overrides)
     )
-    
     candidate_map[
       override_dt,
       candidate_value_dataset := i.candidate_value_dataset,
       on = "candidate_dataset"
     ]
   }
-  
+
   candidate_values_from_stats <- merge(
     candidate_map,
     merge(
       dataset_stats[
         ,
         .(
-          candidate_value_dataset = dataset,
-          lon,
-          lat,
+          candidate_value_dataset = dataset, lon, lat,
           candidate_mean = dataset_mean,
           candidate_sd = dataset_sd,
           candidate_n_years_mean = n_years_mean
@@ -688,48 +391,41 @@ prepare_candidate_reference_values <- function(
       dataset_slopes[
         ,
         .(
-          candidate_value_dataset = dataset,
-          lon,
-          lat,
+          candidate_value_dataset = dataset, lon, lat,
           candidate_sen_slope = sen_slope,
           candidate_p_value = p_value,
           candidate_n_years_slope = n_years_slope
         )
       ],
-      by = c("candidate_value_dataset", "lon", "lat"),
-      all = TRUE
+      by = c("candidate_value_dataset", "lon", "lat"), all = TRUE
     ),
-    by = "candidate_value_dataset",
-    allow.cartesian = TRUE
+    by = "candidate_value_dataset", allow.cartesian = TRUE
   )
-  
+
   candidate_values_from_stats[
     ,
     candidate_stat_sig := is.finite(candidate_p_value) &
       candidate_p_value < P_VALUE_THRESHOLD
   ]
-  
+
   missing_value_datasets <- setdiff(
     candidate_map$candidate_value_dataset,
     unique(dataset_stats$dataset)
   )
-  
+
   if (length(missing_value_datasets) > 0) {
-    
     raw_cell_diagnostics <- raw_dt[
-      variable == variable_name &
-        dataset %in% missing_value_datasets,
+      variable == variable_name & dataset %in% missing_value_datasets,
       {
         value_ordered <- value[order(year)]
         value_valid <- value_ordered[is.finite(value_ordered)]
-        
+
         if (
           length(value_valid) >= MIN_YEARS_FOR_TREND &&
           length(unique(value_valid)) > 1
         ) {
           sen_result <- sens.slope(x = value_valid)
           mk_result <- mk.test(x = value_valid)
-          
           list(
             candidate_mean = mean(value, na.rm = TRUE),
             candidate_sd = sd(value, na.rm = TRUE),
@@ -749,119 +445,68 @@ prepare_candidate_reference_values <- function(
           )
         }
       },
-      by = .(
-        candidate_value_dataset = dataset,
-        lon,
-        lat
-      )
+      by = .(candidate_value_dataset = dataset, lon, lat)
     ]
-    
+
     raw_cell_diagnostics[
       ,
       candidate_stat_sig := is.finite(candidate_p_value) &
         candidate_p_value < P_VALUE_THRESHOLD
     ]
-    
+
     candidate_values_from_raw <- merge(
-      candidate_map[
-        candidate_value_dataset %in% missing_value_datasets
-      ],
+      candidate_map[candidate_value_dataset %in% missing_value_datasets],
       raw_cell_diagnostics,
-      by = "candidate_value_dataset",
-      allow.cartesian = TRUE
+      by = "candidate_value_dataset", allow.cartesian = TRUE
     )
-    
+
     candidate_cell_values <- rbindlist(
-      list(
-        candidate_values_from_stats,
-        candidate_values_from_raw
-      ),
-      use.names = TRUE,
-      fill = TRUE
+      list(candidate_values_from_stats, candidate_values_from_raw),
+      use.names = TRUE, fill = TRUE
     )
-    
   } else {
-    
     candidate_cell_values <- candidate_values_from_stats
-    
   }
-  
+
   candidate_reference_values <- merge(
     candidate_cell_values,
     reference_use,
-    by = c("candidate_dataset", "lon", "lat"),
-    all.x = TRUE
+    by = c("candidate_dataset", "lon", "lat"), all.x = TRUE
   )
-  
+
   setcolorder(
     candidate_reference_values,
     c(
-      "candidate_dataset",
-      "candidate_value_dataset",
-      "lon",
-      "lat",
-      "candidate_mean",
-      "candidate_sd",
-      "candidate_n_years_mean",
-      "candidate_sen_slope",
-      "candidate_p_value",
-      "candidate_stat_sig",
+      "candidate_dataset", "candidate_value_dataset", "lon", "lat",
+      "candidate_mean", "candidate_sd", "candidate_n_years_mean",
+      "candidate_sen_slope", "candidate_p_value", "candidate_stat_sig",
       "candidate_n_years_slope",
-      "ref_mean_median",
-      "ref_mean_iqr",
-      "ref_sd_median",
-      "ref_sd_iqr",
-      "ref_slope_median",
-      "ref_slope_iqr",
-      "n_significant",
-      "n_pos",
-      "n_neg",
-      "majority_significant",
-      "majority_agrees",
-      "majority_sign"
+      "ref_mean_median", "ref_mean_iqr", "ref_sd_median", "ref_sd_iqr",
+      "ref_slope_median", "ref_slope_iqr",
+      "n_significant", "n_pos", "n_neg",
+      "majority_significant", "majority_agrees", "majority_sign"
     )
   )
-  
+
   setorder(candidate_reference_values, candidate_dataset, lon, lat)
-  
   candidate_reference_values
 }
 
-# Analysis ====================================================================
+# Analysis ===================================================================
 
 validate_dataset_names(
-  dt = prec_evap_raw,
-  variable_name = "prec",
-  dataset_names = PREC_ENSEMBLE_NAMES_SHORT,
-  label = "precipitation ensemble"
+  dt = prec_evap_raw, variable_name = "prec",
+  dataset_names = PREC_ENSEMBLE_NAMES_SHORT, label = "precipitation ensemble"
 )
-
 validate_dataset_names(
-  dt = prec_evap_raw,
-  variable_name = "evap",
-  dataset_names = EVAP_ENSEMBLE_NAMES_SHORT,
-  label = "evaporation ensemble"
+  dt = prec_evap_raw, variable_name = "evap",
+  dataset_names = EVAP_ENSEMBLE_NAMES_SHORT, label = "evaporation ensemble"
 )
 
-message(
-  "Precipitation ensemble datasets: ",
-  paste(PREC_ENSEMBLE_NAMES_SHORT, collapse = ", ")
-)
-
-message(
-  "Evaporation ensemble datasets: ",
-  paste(EVAP_ENSEMBLE_NAMES_SHORT, collapse = ", ")
-)
-
-message(
-  "Analysis candidate datasets: ",
-  paste(EVAP_NAMES_SHORT, collapse = ", ")
-)
-
-message(
-  "Using workers: ",
-  N_WORKERS
-)
+message("Precipitation ensemble: ", paste(PREC_ENSEMBLE_NAMES_SHORT, collapse = ", "))
+message("Evaporation ensemble: ", paste(EVAP_ENSEMBLE_NAMES_SHORT, collapse = ", "))
+message("Analysis candidates: ", paste(EVAP_NAMES_SHORT, collapse = ", "))
+message("Using workers: ", N_WORKERS)
 
 prec_ensemble <- estimate_ensemble_products(
   dt = prec_evap_raw[variable == "prec"],
@@ -898,141 +543,38 @@ evap_candidate_reference_values <- prepare_candidate_reference_values(
   candidate_names = EVAP_NAMES_SHORT
 )
 
-# Outputs =====================================================================
+# Outputs ====================================================================
 
-saveRDS(
-  prec_ensemble$stats,
-  file.path(PATH_OUTPUT_DATA, "prec_ensemble_stats.Rds")
-)
-
-saveRDS(
-  prec_ensemble$datasets,
-  file.path(PATH_OUTPUT_DATA, "prec_ensemble.Rds")
-)
-
-saveRDS(
-  prec_ensemble$dataset_stats,
-  file.path(PATH_OUTPUT_DATA, "prec_dataset_stats.Rds")
-)
-
-saveRDS(
-  prec_ensemble$slopes,
-  file.path(PATH_OUTPUT_DATA, "prec_ensemble_slopes.Rds")
-)
-
-saveRDS(
-  prec_ensemble$candidate_reference_stats,
-  file.path(PATH_OUTPUT_DATA, "prec_candidate_reference_stats.Rds")
-)
-
-saveRDS(
+write_fst(
   prec_candidate_reference_values,
-  file.path(PATH_OUTPUT_DATA, "prec_candidate_reference_values.Rds")
+  file.path(PATH_OUTPUT_DATA, "prec_candidate_reference_values.fst")
 )
 
-saveRDS(
-  evap_ensemble$stats,
-  file.path(PATH_OUTPUT_DATA, "evap_ensemble_stats.Rds")
-)
-
-saveRDS(
-  evap_ensemble$datasets,
-  file.path(PATH_OUTPUT_DATA, "evap_ensemble.Rds")
-)
-
-saveRDS(
-  evap_ensemble$dataset_stats,
-  file.path(PATH_OUTPUT_DATA, "evap_dataset_stats.Rds")
-)
-
-saveRDS(
-  evap_ensemble$slopes,
-  file.path(PATH_OUTPUT_DATA, "evap_ensemble_slopes.Rds")
-)
-
-saveRDS(
-  evap_ensemble$candidate_reference_stats,
-  file.path(PATH_OUTPUT_DATA, "evap_candidate_reference_stats.Rds")
-)
-
-saveRDS(
+write_fst(
   evap_candidate_reference_values,
-  file.path(PATH_OUTPUT_DATA, "evap_candidate_reference_values.Rds")
+  file.path(PATH_OUTPUT_DATA, "evap_candidate_reference_values.fst")
 )
 
-# Validation ==================================================================
+# Validation =================================================================
 
-dummy <- prec_ensemble$candidate_reference_stats[lon == 36.875 & lat == 45.375]
+stopifnot(nrow(prec_candidate_reference_values) > 0)
+stopifnot(nrow(evap_candidate_reference_values) > 0)
 
-stopifnot(nrow(prec_ensemble$stats) > 0)
-stopifnot(nrow(evap_ensemble$stats) > 0)
+stopifnot(all(PREC_ENSEMBLE_NAMES_SHORT %in% unique(prec_ensemble$dataset_stats$dataset)))
+stopifnot(all(EVAP_ENSEMBLE_NAMES_SHORT %in% unique(evap_ensemble$dataset_stats$dataset)))
 
-stopifnot(nrow(prec_ensemble$candidate_reference_stats) > 0)
-stopifnot(nrow(evap_ensemble$candidate_reference_stats) > 0)
+stopifnot(all(EVAP_NAMES_SHORT %in% unique(prec_candidate_reference_values$candidate_dataset)))
+stopifnot(all(EVAP_NAMES_SHORT %in% unique(evap_candidate_reference_values$candidate_dataset)))
 
+# GLEAM is absent from the precipitation ensemble (kept in reference) but present
+# in the evaporation ensemble (removed from its own reference).
 stopifnot(
-  all(PREC_ENSEMBLE_NAMES_SHORT %in% unique(prec_ensemble$datasets$dataset))
+  unique(prec_ensemble$candidate_reference_stats[
+    candidate_dataset == "GLEAM", candidate_removed_from_reference
+  ]) == FALSE
 )
-
 stopifnot(
-  all(EVAP_ENSEMBLE_NAMES_SHORT %in% unique(evap_ensemble$datasets$dataset))
-)
-
-stopifnot(
-  all(
-    EVAP_NAMES_SHORT %in%
-      unique(prec_ensemble$candidate_reference_stats$candidate_dataset)
-  )
-)
-
-stopifnot(
-  all(
-    EVAP_NAMES_SHORT %in%
-      unique(evap_ensemble$candidate_reference_stats$candidate_dataset)
-  )
-)
-
-gleam_prec_reference <- unique(
-  prec_ensemble$candidate_reference_stats[
-    candidate_dataset == "GLEAM",
-    .(
-      candidate_present_in_variable,
-      candidate_removed_from_reference,
-      reference_n_datasets,
-      reference_names
-    )
-  ]
-)
-
-gleam_evap_reference <- unique(
-  evap_ensemble$candidate_reference_stats[
-    candidate_dataset == "GLEAM",
-    .(
-      candidate_present_in_variable,
-      candidate_removed_from_reference,
-      reference_n_datasets,
-      reference_names
-    )
-  ]
-)
-
-print(gleam_prec_reference)
-print(gleam_evap_reference)
-
-stopifnot(
-  unique(
-    prec_ensemble$candidate_reference_stats[
-      candidate_dataset == "GLEAM",
-      candidate_removed_from_reference
-    ]
-  ) == FALSE
-)
-
-stopifnot(
-  unique(
-    evap_ensemble$candidate_reference_stats[
-      candidate_dataset == "GLEAM",
-      candidate_removed_from_reference
-    ]
-  ) == TRUE
+  unique(evap_ensemble$candidate_reference_stats[
+    candidate_dataset == "GLEAM", candidate_removed_from_reference
+  ]) == TRUE
 )

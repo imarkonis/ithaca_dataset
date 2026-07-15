@@ -16,14 +16,18 @@
 
 source("code/_source.R")
 
+library(fst)
+
 # Inputs ======================================================================
 
-prec_candidate_reference_values <- readRDS(
-  file.path(PATH_OUTPUT_DATA, "prec_candidate_reference_values.Rds")
+prec_candidate_reference_values <- read_fst(
+  file.path(PATH_OUTPUT_DATA, "prec_candidate_reference_values.fst"),
+  as.data.table = TRUE
 )
 
-evap_candidate_reference_values <- readRDS(
-  file.path(PATH_OUTPUT_DATA, "evap_candidate_reference_values.Rds")
+evap_candidate_reference_values <- read_fst(
+  file.path(PATH_OUTPUT_DATA, "evap_candidate_reference_values.fst"),
+  as.data.table = TRUE
 )
 
 
