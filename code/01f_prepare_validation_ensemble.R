@@ -15,7 +15,6 @@
 
 source("code/_source.R")
 
-library(fst)
 library(parallel)
 library(trend)
 
