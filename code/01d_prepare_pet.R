@@ -12,7 +12,6 @@
 
 source("code/_source.R")
 
-library(fst)
 library(lubridate)
 
 # Inputs =====================================================================
