@@ -1,7 +1,7 @@
 # PET input variables (MERRA-2 and MSWX)
 
 ## Related issue
-Issue #10: *Compile input-dataset metadata table (units, grids, versions, links, citations) for PET estimation*.
+Issue #47: *Compile input-dataset metadata table (units, grids, versions, links, citations) for PET estimation*.
 
 ## Purpose
 PET is produced from two parallel forcing sources so the estimates can be compared:
