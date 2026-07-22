@@ -1,7 +1,7 @@
 # PET input variables (MERRA-2 and MSWX)
 
 ## Related issue
-Issue #10: *Compile input-dataset metadata table (units, grids, versions, links, citations)*.
+Issue #10: *Compile input-dataset metadata table (units, grids, versions, links, citations) for PET estimation*.
 
 ## Purpose
 PET is produced from two parallel forcing sources so the estimates can be compared:
@@ -38,15 +38,15 @@ PET is produced from two parallel forcing sources so the estimates can be compar
 
 | # | File | Variable | Description | Unit | Coverage |
 |---|------|----------|-------------|------|-------------------|
-| 1 | `mswx-past_r_pct_land_197901_202512_025_monthly.nc` | r | 2 m relative humidity | % | 1979–2025 |
-| 2 | `mswx-past_sp_pa_land_197901_202412_025_monthly.nc` | sp | Surface air pressure | Pa | 1979–2024 |
-| 3 | `mswx-past_ssrd_Wm-2_land_197902_202512_025_monthly.nc` | ssrd | Surface downwelling shortwave (solar) radiation | W m⁻² | 1979–2025 |
-| 4 | `mswx-past_strd_Wm-2_land_197902_202512_025_monthly.nc` | strd | Surface downwelling longwave (thermal) radiation | W m⁻² | 1979–2025 |
-| 5 | `mswx-past_t2m_degC_land_197901_202512_025_monthly.nc` | t2m | 2 m air temperature (mean) | °C | 1979–2025 |
-| 6 | `mswx-past_tmax_degC_land_197901_202512_025_monthly.nc` | tmax | 2 m daily maximum air temperature | °C | 1979–2025 |
-| 7 | `mswx-past_tmin_degC_land_197901_202512_025_monthly.nc` | tmin | 2 m daily minimum air temperature | °C | 1979–2025 |
-| 8 | `mswx-past_u10_ms-1_land_197901_202412_025_monthly.nc` | u10 | 10 m wind speed (magnitude) | m s⁻¹ | 1979–2025 |
-| 9 | `era5-land_albedo_198001_202501_025_monthly.nc` | albedo | Surface albedo (**from ERA5-Land**, not MSWX) | dimensionless (0–1) | 1980–2025 |
+| 1 | `mswx-past_r_pct_land_197901_202512_025_monthly.nc` | r | 2 m relative humidity | % |197901–202512 |
+| 2 | `mswx-past_sp_pa_land_197901_202412_025_monthly.nc` | sp | Surface air pressure | Pa | 197901–202412 |
+| 3 | `mswx-past_ssrd_Wm-2_land_197902_202512_025_monthly.nc` | ssrd | Surface downwelling shortwave (solar) radiation | W m⁻² | 197902–202512 |
+| 4 | `mswx-past_strd_Wm-2_land_197902_202512_025_monthly.nc` | strd | Surface downwelling longwave (thermal) radiation | W m⁻² | 197902–202512 |
+| 5 | `mswx-past_t2m_degC_land_197901_202512_025_monthly.nc` | t2m | 2 m air temperature (mean) | °C | 197901–202512 |
+| 6 | `mswx-past_tmax_degC_land_197901_202512_025_monthly.nc` | tmax | 2 m daily maximum air temperature | °C | 197901–202512 |
+| 7 | `mswx-past_tmin_degC_land_197901_202512_025_monthly.nc` | tmin | 2 m daily minimum air temperature | °C | 197901–202512 |
+| 8 | `mswx-past_u10_ms-1_land_197901_202412_025_monthly.nc` | u10 | 10 m wind speed (magnitude) | m s⁻¹ | 197901–202412 |
+| 9 | `era5-land_albedo_198001_202501_025_monthly.nc` | albedo | Surface albedo (**from ERA5-Land**, not MSWX) | dimensionless (0–1) | 198001–202501 |
 
 
 > **Wind note (MSWX):** MSWX distributes a single **wind-speed magnitude at 10 m** (`u10`), not u/v components.
@@ -56,7 +56,18 @@ PET is produced from two parallel forcing sources so the estimates can be compar
 ---
 
 
-## 4. Key differences between the two sources
+## 4. Dataset other info (versions, grids, links, citations)
+
+| Dataset | Version / product | Native resolution | Provider | Data link | DOI |
+|---------|-------------------|-------------------|----------|-----------|----------|
+| MERRA-2 | GEOS-5.12.4 (M2 reanalysis) | 0.5° lat × 0.625° lon, hourly, 1980–present | NASA GMAO | https://gmao.gsfc.nasa.gov/reanalysis/MERRA-2/ | https://doi.org/10.1175/JCLI-D-16-0758.1 |
+| MSWX (MSWX-Past) | MSWX-Past (ERA5-based historical stream) | 0.1°, 3-hourly, 1979–present | GloH2O | https://www.gloh2o.org/mswx/ | https://doi.org/10.1175/BAMS-D-21-0145.1 |
+| ERA5-Land (albedo only) | ERA5-Land monthly averaged | ≈0.1° (~9 km), hourly, 1950–present | ECMWF / Copernicus C3S | https://doi.org/10.24381/cds.68d2bb30 | https://doi.org/10.5194/essd-13-4349-2021 |
+
+---
+
+
+## 5. Key differences between the two sources
 These are the points that made the input list "unclear" and are worth documenting explicitly:
 
 1. **Humidity representation** — MERRA-2 provides **specific humidity** (kg kg⁻¹); MSWX provides **relative humidity** (%). Vapour pressure is derived differently in each pipeline.
@@ -64,15 +75,5 @@ These are the points that made the input list "unclear" and are worth documentin
 3. **Albedo source** — MERRA-2 has its **own** albedo; the MSWX pipeline borrows albedo from **ERA5-Land**.
 4. **Native grid before regridding** — MERRA-2 native 0.5° × 0.625°; MSWX-Past native 0.1°; ERA5-Land native ≈0.1° (~9 km). All are regridded to a common **0.25°** grid (`025`) for PET.
 5. **Temporal coverage** — start dates differ (MERRA-2 from 1980; MSWX from 1979); end months vary slightly per variable, as shown in the coverage columns.
-
----
-
-## 5. Dataset other info (versions, grids, links, citations)
-
-| Dataset | Version / product | Native resolution | Provider | Data link | Citation |
-|---------|-------------------|-------------------|----------|-----------|----------|
-| MERRA-2 | GEOS-5.12.4 (M2 reanalysis) | 0.5° lat × 0.625° lon, hourly, 1980–present | NASA GMAO | https://gmao.gsfc.nasa.gov/reanalysis/MERRA-2/ | Gelaro, R., et al. (2017). The Modern-Era Retrospective Analysis for Research and Applications, Version 2 (MERRA-2). *J. Climate*, 30(14), 5419–5454. https://doi.org/10.1175/JCLI-D-16-0758.1 |
-| MSWX (MSWX-Past) | MSWX-Past (ERA5-based historical stream) | 0.1°, 3-hourly, 1979–present | GloH2O | https://www.gloh2o.org/mswx/ | Beck, H. E., et al. (2022). MSWX: Global 3-Hourly 0.1° Bias-Corrected Meteorological Data. *Bull. Amer. Meteor. Soc.*, 103(3), E710–E732. https://doi.org/10.1175/BAMS-D-21-0145.1 |
-| ERA5-Land (albedo only) | ERA5-Land monthly averaged | ≈0.1° (~9 km), hourly, 1950–present | ECMWF / Copernicus C3S | https://doi.org/10.24381/cds.68d2bb30 | Muñoz-Sabater, J., et al. (2021). ERA5-Land: a state-of-the-art global reanalysis dataset for land applications. *Earth Syst. Sci. Data*, 13, 4349–4383. https://doi.org/10.5194/essd-13-4349-2021 |
 
 ---
