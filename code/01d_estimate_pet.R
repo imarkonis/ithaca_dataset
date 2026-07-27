@@ -177,11 +177,7 @@ for (dataset_name in names(INPUT_FILES)) {
   rm(pet_table)
   gc()
 
-  incomplete_count <- nrow(pet_yearly[month_count != MONTHS_PER_YEAR])
-  pet_yearly <- pet_yearly[month_count == MONTHS_PER_YEAR]
   pet_yearly[, month_count := NULL]
-  message("  dropped ", incomplete_count, " incomplete cell years")
-
   pet_yearly[, (PET_METHOD_COLUMNS) := lapply(.SD, round,
                                               PET_DECIMAL_DIGITS),
              .SDcols = PET_METHOD_COLUMNS]
