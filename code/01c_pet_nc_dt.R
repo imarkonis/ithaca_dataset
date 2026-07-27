@@ -30,8 +30,6 @@ MONTHS_PER_YEAR <- 12
 EXPECTED_MONTH_COUNT <- MONTHS_PER_YEAR * 
   (PERIOD_LAST_YEAR - PERIOD_FIRST_YEAR + 1)
 
-FORCING_FILES <- list( merra2 = MERRA2_FILES, mswx_past = MSWX_FILES)
-
 OUTPUT_FILES <- c( merra2 = "merra2_pet-forcing_mixed_1980_2024_025_monthly.fst", 
                    mswx_past = "mswx-past_pet-forcing_mixed_1980_2024_025_monthly.fst" 
                    )
@@ -69,6 +67,8 @@ MSWX_FILES <- c( tavg = "mswx-past_t2m_degC_land_197901_202512_025_monthly.nc",
                  albedo = "era5-land_albedo_198001_202501_025_monthly.nc"
                  )
 
+FORCING_FILES <- list( merra2 = MERRA2_FILES, mswx_past = MSWX_FILES)
+
 # Functions ==================================================================
 read_nc_as_data_table <- function(nc_path, value_name) {
 # Converts one single-variable monthly NetCDF into a long data.table, on the
@@ -84,11 +84,20 @@ read_nc_as_data_table <- function(nc_path, value_name) {
                   na.rm = TRUE, row.names = NULL)
   )
   
-  if (!"time" %in% names(variable_table)) {
+ time_is_usable <- "time" %in% names(variable_table) &&
+    !all(is.na(variable_table$time))
+  if (!time_is_usable) {
+    if (!"layer" %in% names(variable_table)) {
+      stop("No usable time axis and no layer names in ", nc_path,
+           call. = FALSE)
+    }
     layer_day_count <- as.numeric(sub(".*=", "", variable_table$layer))
     if (anyNA(layer_day_count)) {
       stop("Could not parse dates from layer names of ", nc_path,
            call. = FALSE)
+    }
+    if ("time" %in% names(variable_table)) {
+      variable_table[, time := NULL]
     }
     variable_table[, time := as.Date(layer_day_count, origin = "1970-01-01")]
   }
@@ -98,11 +107,9 @@ read_nc_as_data_table <- function(nc_path, value_name) {
   # Monthly stamps sit on different days across products, so every date is
   # moved to the first of its month before the variables are merged.
   variable_table[, date := as.Date(date)]
-  variable_table[, date := as.Date(format(date, "%Y-%m-01"))]
   variable_table[, x := round(x, COORDINATE_DIGITS)]
   variable_table[, y := round(y, COORDINATE_DIGITS)]
   variable_table <- variable_table[date >= PERIOD_START & date <= PERIOD_END]
-
   setcolorder(variable_table, c(MERGE_KEYS, value_name))
   setkeyv(variable_table, MERGE_KEYS)
   variable_table[]
