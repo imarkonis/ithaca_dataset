@@ -8,7 +8,6 @@
 #   3) evaluates slope significance agreement with the reference ensemble
 #   4) ranks datasets within each grid cell
 #   5) merges precipitation and evaporation ranks
-#   6) builds best/worst dataset maps for four agreement properties
 # ============================================================================
 
 
@@ -20,12 +19,12 @@ source("code/_source.R")
 # Inputs ======================================================================
 
 prec_candidate_reference_values <- read_fst(
-  file.path(PATH_OUTPUT_DATA, "prec_candidate_reference_values.fst"),
+  file.path(PATH_OUTPUT_OUTPUT, "prec_reference_values.fst"),
   as.data.table = TRUE
 )
 
 evap_candidate_reference_values <- read_fst(
-  file.path(PATH_OUTPUT_DATA, "evap_candidate_reference_values.fst"),
+  file.path(PATH_OUTPUT_OUTPUT, "evap_reference_values.fst"),
   as.data.table = TRUE
 )
 
@@ -46,23 +45,6 @@ PROPERTY_BIAS <- c(
 
 relative_abs_bias <- function(value, reference) {
   abs(value - reference) / (abs(reference) + EPSILON)
-}
-
-
-check_required_columns <- function(dt, required_cols, object_name) {
-  missing_cols <- setdiff(required_cols, names(dt))
-  
-  if (length(missing_cols) > 0) {
-    stop(
-      paste0(
-        object_name,
-        " is missing required columns: ",
-        paste(missing_cols, collapse = ", ")
-      )
-    )
-  }
-  
-  invisible(TRUE)
 }
 
 
@@ -323,37 +305,6 @@ build_best_worst_maps <- function(dt, property_bias) {
 
 # Analysis ====================================================================
 
-required_cols <- c(
-  "candidate_dataset",
-  "candidate_value_dataset",
-  "lon",
-  "lat",
-  "candidate_mean",
-  "candidate_sd",
-  "candidate_n_years_mean",
-  "candidate_sen_slope",
-  "candidate_p_value",
-  "candidate_stat_sig",
-  "candidate_n_years_slope",
-  "ref_mean_median",
-  "ref_sd_median",
-  "ref_slope_median",
-  "majority_significant",
-  "majority_agrees"
-)
-
-check_required_columns(
-  dt = prec_candidate_reference_values,
-  required_cols = required_cols,
-  object_name = "prec_candidate_reference_values"
-)
-
-check_required_columns(
-  dt = evap_candidate_reference_values,
-  required_cols = required_cols,
-  object_name = "evap_candidate_reference_values"
-)
-
 ## Build component statistics
 
 prec_stats <- build_component_stats(
@@ -370,7 +321,6 @@ setkey(prec_stats, lon, lat, dataset)
 setkey(evap_stats, lon, lat, dataset)
 
 dataset_stats <- evap_stats[prec_stats, nomatch = 0]
-
 
 ## Build component ranks
 
@@ -392,75 +342,23 @@ dataset_ranks <- evap_ranks[prec_ranks, nomatch = 0]
 dataset_stats[, dataset := factor(dataset)]
 dataset_ranks[, dataset := factor(dataset)]
 
-
-## Best and worst maps
-
-bw_maps <- build_best_worst_maps(
-  dt = dataset_ranks,
-  property_bias = PROPERTY_BIAS
-)
-
-bw_maps[
-  ,
-  property := factor(
-    property,
-    levels = names(PROPERTY_BIAS)
-  )
-]
-
-bw_maps[
-  ,
-  position := factor(
-    position,
-    levels = c("best", "worst")
-  )
-]
-
-
 # Outputs =====================================================================
 
 saveRDS(
   dataset_ranks,
-  file.path(PATH_OUTPUT_DATA, "dataset_ranks.Rds")
+  file.path(PATH_OUTPUT_OUTPUT, "dataset_ranks.Rds")
 )
 
 saveRDS(
   dataset_stats,
-  file.path(PATH_OUTPUT_DATA, "prec_evap_stats.Rds")
+  file.path(PATH_OUTPUT_OUTPUT, "prec_evap_stats.Rds")
 )
-
-saveRDS(
-  bw_maps,
-  file.path(PATH_OUTPUT_DATA, "dataset_best_worst_maps.Rds")
-)
-
-
-# Plot ========================================================================
-
-ggplot(bw_maps) +
-  geom_tile(aes(x = lon, y = lat, fill = dataset)) +
-  borders("world", colour = "grey20", linewidth = 0.15) +
-  facet_grid(position ~ property) +
-  coord_equal(expand = FALSE) +
-  labs(
-    title = "Best and worst dataset by grid cell",
-    subtitle = "Ranked within cell by candidate-specific leave-out reference bias; lower bias = best",
-    x = NULL,
-    y = NULL,
-    fill = "Dataset"
-  ) +
-  theme(
-    legend.position = "bottom",
-    legend.key.width = unit(1.2, "cm"),
-    panel.spacing = unit(0.4, "lines")
-  )
 
 
 # Validation ==================================================================
 
 stopifnot(nrow(dataset_ranks) > 0)
 stopifnot(nrow(dataset_stats) > 0)
-stopifnot(nrow(bw_maps) > 0)
 
 stopifnot(
   unique(
@@ -479,12 +377,3 @@ stopifnot(
     ]
   ) == "GLEAM"
 )
-
-stopifnot(
-  all(
-    names(PROPERTY_BIAS) %in%
-      unique(as.character(bw_maps$property))
-  )
-)
-
-bw_maps[, .N, .(dataset, position)]
