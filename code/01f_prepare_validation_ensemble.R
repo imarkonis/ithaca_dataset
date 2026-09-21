@@ -516,12 +516,12 @@ evap_candidate_reference_values <- prepare_candidate_reference_values(
 
 write_fst(
   prec_candidate_reference_values,
-  file.path(PATH_OUTPUT_DATA, "prec_candidate_reference_values.fst")
+  file.path(PATH_OUTPUT_OUTPUT, "prec_reference_values.fst")
 )
 
 write_fst(
   evap_candidate_reference_values,
-  file.path(PATH_OUTPUT_DATA, "evap_candidate_reference_values.fst")
+  file.path(PATH_OUTPUT_OUTPUT, "evap_reference_values.fst")
 )
 
 # Validation =================================================================

@@ -75,12 +75,12 @@ pet_mean <- pet[
 
 write_fst(
   pet,
-  file.path(PATH_OUTPUT_DATA, "pet.fst")
+  file.path(PATH_OUTPUT_OUTPUT, "pet.fst")
 )
 
 write_fst(
   pet_mean,
-  file.path(PATH_OUTPUT_DATA, "pet_mean.fst")
+  file.path(PATH_OUTPUT_OUTPUT, "pet_mean.fst")
 )
 
 # Validation =================================================================
