@@ -1,5 +1,5 @@
 
-# A global probabilistic ensemble for land-atmospheric water exchange
+# A global probabilistic ensemble for long-term hydroclimatic 
 
 This folder contains the working material for the standalone dataset paper on terrestrial water-cycle fluxes.
 
