@@ -1,5 +1,5 @@
 
-# A global probabilistic ensemble for long-term hydroclimatic 
+# A global probabilistic ensemble for the study of annual hydroclimatic variability
 
 This folder contains the working material for the standalone dataset paper on terrestrial water-cycle fluxes.
 
