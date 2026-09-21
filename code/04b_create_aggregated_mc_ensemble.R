@@ -1,135 +1,79 @@
 # ============================================================================
-# Aggregate Monte Carlo dataset selections to annual P and E ensembles
+# Aggregate the 100 x 10 scenario Monte Carlo selections to annual P and E
+# ensembles.
 #
-# This script:
-# 1. Reads Monte Carlo dataset selections for base and scenarios runs
-# 2. Joins selections to existing area-weighted dataset-region-biome-year values
-# 3. Aggregates selected values to IPCC region and global annual P and E
-# 4. Saves compact outputs in PATH_OUTPUT_DATA using _base and _scenarios suffixes
+# 1. Join selected datasets to dataset-region-biome-year P and E
+# 2. Aggregate region-biome values to IPCC regions using area weights
+# 3. Aggregate directly from region-biome values to global annual P and E
+#
+# The separate 1000-member change ensemble for the other paper is not used here.
 # ============================================================================
 
-# Libraries ===================================================================
+
+# Libraries ==================================================================
 
 source("code/_source.R")
+
 
 # Inputs ======================================================================
 
 dataset_region_biome_year <- readRDS(
-  file.path(PATH_OUTPUT_DATA, "dataset_region_biome_year.Rds")
+  file.path(PATH_OUTPUT_OUTPUT, "dataset_region_biome_year.Rds")
 )
 
-twc_grid_classes <- readRDS(
-  file.path(PATH_OUTPUT_DATA, "twc_grid_classes.Rds")
+grid_classes <- readRDS(
+  file.path(PATH_OUTPUT_OUTPUT, "grid_classes.Rds")
 )
 
-# Constants & Variables =======================================================
-
-RUN_IDS <- c(
-  "base",
-  "scenarios"
+mc_selection <- readRDS(
+  file.path(PATH_OUTPUT_OUTPUT, "mc_selection_scenarios.Rds")
 )
+
 
 # Functions ===================================================================
 
-get_cell_area_column <- function(dt) {
+prepare_region_biome_area <- function(grid_classes) {
   
-  possible_area_cols <- c(
-    "cell_area",
-    "area",
-    "area_km2",
-    "area_m2",
-    "area_sum"
-  )
+  grid_dt <- as.data.table(copy(grid_classes))
   
-  area_cols <- intersect(possible_area_cols, names(dt))
-  
-  if (length(area_cols) == 0L) {
-    return(NA_character_)
-  }
-  
-  area_cols[1]
-}
-
-prepare_region_biome_area <- function(twc_grid_classes) {
-  
-  grid_dt <- as.data.table(copy(twc_grid_classes))
-  
-  required_cols <- c("lon", "lat", "region", "biome")
-  missing_cols <- setdiff(required_cols, names(grid_dt))
-  
-  if (length(missing_cols) > 0L) {
-    stop(
-      "twc_grid_classes is missing required columns: ",
-      paste(missing_cols, collapse = ", ")
-    )
-  }
-  
-  area_col <- get_cell_area_column(grid_dt)
-  
-  if (is.na(area_col)) {
+  # Use existing cell-area information where available; otherwise use the
+  # latitude-dependent relative cell area.
+  if ("cell_weight" %in% names(grid_dt)) {
     
-    message(
-      "No explicit cell-area column found. ",
-      "Using cos(latitude) as relative area weight."
-    )
-    
-    grid_dt[
-      ,
-      cell_area := cos(lat * pi / 180)
-    ]
+    grid_dt[, cell_area_weight := cell_weight]
     
   } else {
     
-    message("Using existing area column: ", area_col)
-    
-    if (area_col != "cell_area") {
-      setnames(
-        grid_dt,
-        old = area_col,
-        new = "cell_area"
-      )
-    }
+    grid_dt[, cell_area_weight := cos(lat * pi / 180)]
   }
   
-  grid_dt[
-    ,
-    `:=`(
-      region = as.character(region),
-      biome = as.character(biome)
-    )
-  ]
-  
-  grid_dt <- grid_dt[
-    is.finite(lon) &
-      is.finite(lat) &
+  unique(
+    grid_dt[
       !is.na(region) &
-      !is.na(biome) &
-      is.finite(cell_area) &
-      cell_area > 0,
-    .(lon, lat, region, biome, cell_area)
-  ]
-  
-  grid_dt <- unique(
-    grid_dt,
+        !is.na(biome) &
+        is.finite(cell_area_weight) &
+        cell_area_weight > 0,
+      .(
+        lon,
+        lat,
+        region = as.character(region),
+        biome = as.character(biome),
+        cell_area_weight
+      )
+    ],
     by = c("lon", "lat")
-  )
-  
-  region_biome_area <- grid_dt[
+  )[
     ,
     .(
-      area_weight = sum(cell_area, na.rm = TRUE)
+      area_weight = sum(cell_area_weight)
     ),
-    by = .(region, biome)
+    by = .(
+      region,
+      biome
+    )
   ]
-  
-  setkey(
-    region_biome_area,
-    region,
-    biome
-  )
-  
-  region_biome_area
 }
+
 
 weighted_mean_safe <- function(value, weight) {
   
@@ -144,27 +88,14 @@ weighted_mean_safe <- function(value, weight) {
   sum(value[ok] * weight[ok]) / sum(weight[ok])
 }
 
-prepare_dataset_region_biome_year <- function(dataset_region_biome_year) {
+
+make_mc_region_biome_year <- function(
+    dataset_region_biome_year,
+    mc_selection
+) {
   
   dt <- as.data.table(copy(dataset_region_biome_year))
-  
-  required_cols <- c(
-    "dataset",
-    "region",
-    "biome",
-    "year",
-    "prec",
-    "evap"
-  )
-  
-  missing_cols <- setdiff(required_cols, names(dt))
-  
-  if (length(missing_cols) > 0L) {
-    stop(
-      "dataset_region_biome_year is missing required columns: ",
-      paste(missing_cols, collapse = ", ")
-    )
-  }
+  sel <- as.data.table(copy(mc_selection))
   
   dt[
     ,
@@ -174,49 +105,6 @@ prepare_dataset_region_biome_year <- function(dataset_region_biome_year) {
       biome = as.character(biome)
     )
   ]
-  
-  dt <- dt[
-    ,
-    .(
-      dataset,
-      region,
-      biome,
-      year,
-      prec,
-      evap
-    )
-  ]
-  
-  setkey(
-    dt,
-    dataset,
-    region,
-    biome
-  )
-  
-  dt
-}
-
-prepare_mc_selection <- function(mc_selection) {
-  
-  sel <- as.data.table(copy(mc_selection))
-  
-  required_cols <- c(
-    "sim",
-    "scenario",
-    "region",
-    "biome",
-    "dataset"
-  )
-  
-  missing_cols <- setdiff(required_cols, names(sel))
-  
-  if (length(missing_cols) > 0L) {
-    stop(
-      "mc_selection is missing required columns: ",
-      paste(missing_cols, collapse = ", ")
-    )
-  }
   
   sel[
     ,
@@ -228,56 +116,13 @@ prepare_mc_selection <- function(mc_selection) {
     )
   ]
   
-  sel <- sel[
-    ,
-    .(
-      sim,
-      scenario,
+  dt[
+    sel,
+    on = .(
+      dataset,
       region,
-      biome,
-      dataset
-    )
-  ]
-  
-  setkey(
-    sel,
-    dataset,
-    region,
-    biome
-  )
-  
-  sel
-}
-
-make_mc_region_biome_year <- function(dataset_region_biome_year, mc_selection) {
-  
-  dt <- prepare_dataset_region_biome_year(
-    dataset_region_biome_year = dataset_region_biome_year
-  )
-  
-  sel <- prepare_mc_selection(
-    mc_selection = mc_selection
-  )
-  
-  dataset_keys <- unique(
-    dt[, .(dataset, region, biome)]
-  )
-  
-  missing_selected_values <- sel[
-    !dataset_keys,
-    on = .(dataset, region, biome)
-  ]
-  
-  if (nrow(missing_selected_values) > 0L) {
-    print(missing_selected_values)
-    stop(
-      "Some selected dataset x region x biome combinations are missing from dataset_region_biome_year."
-    )
-  }
-  
-  out <- dt[
-    sel,
-    on = .(dataset, region, biome),
+      biome
+    ),
     allow.cartesian = TRUE,
     nomatch = 0L
   ][
@@ -293,269 +138,152 @@ make_mc_region_biome_year <- function(dataset_region_biome_year, mc_selection) {
       evap
     )
   ]
-  
-  setkey(
-    out,
-    sim,
-    scenario,
-    region,
-    biome,
-    year
-  )
-  
-  out
 }
 
-make_mc_region_year <- function(mc_region_biome_year, region_biome_area) {
-  
-  dt <- region_biome_area[
-    copy(mc_region_biome_year),
-    on = .(region, biome),
-    nomatch = 0L
-  ]
-  
-  missing_area <- mc_region_biome_year[
-    !region_biome_area,
-    on = .(region, biome)
-  ]
-  
-  if (nrow(missing_area) > 0L) {
-    print(unique(missing_area[, .(region, biome)]))
-    stop("Some region x biome combinations are missing area weights.")
-  }
-  
-  out <- dt[
-    ,
-    .(
-      prec = weighted_mean_safe(prec, area_weight),
-      evap = weighted_mean_safe(evap, area_weight)
-    ),
-    by = .(sim, scenario, region, year)
-  ]
-  
-  setkey(
-    out,
-    sim,
-    scenario,
-    region,
-    year
-  )
-  
-  out
-}
 
-make_mc_global_year <- function(mc_region_biome_year, region_biome_area) {
-  
-  dt <- region_biome_area[
-    copy(mc_region_biome_year),
-    on = .(region, biome),
-    nomatch = 0L
-  ]
-  
-  missing_area <- mc_region_biome_year[
-    !region_biome_area,
-    on = .(region, biome)
-  ]
-  
-  if (nrow(missing_area) > 0L) {
-    print(unique(missing_area[, .(region, biome)]))
-    stop("Some region x biome combinations are missing area weights.")
-  }
-  
-  out <- dt[
-    ,
-    .(
-      prec = weighted_mean_safe(prec, area_weight),
-      evap = weighted_mean_safe(evap, area_weight)
-    ),
-    by = .(sim, scenario, year)
-  ]
-  
-  setkey(
-    out,
-    sim,
-    scenario,
-    year
-  )
-  
-  out
-}
-
-aggregate_one_run <- function(
-    run_id,
-    dataset_region_biome_year,
+make_mc_region_year <- function(
+    mc_region_biome_year,
     region_biome_area
 ) {
   
-  cat("\nAggregating MC run:", run_id, "\n")
-  
-  selection_file <- file.path(
-    PATH_OUTPUT_DATA,
-    paste0("mc_selection_", run_id, ".Rds")
-  )
-  
-  if (!file.exists(selection_file)) {
-    stop("Missing MC selection file: ", selection_file)
-  }
-  
-  mc_selection <- readRDS(selection_file)
-  
-  mc_region_biome_year <- make_mc_region_biome_year(
-    dataset_region_biome_year = dataset_region_biome_year,
-    mc_selection = mc_selection
-  )
-  
-  mc_region_year <- make_mc_region_year(
-    mc_region_biome_year = mc_region_biome_year,
-    region_biome_area = region_biome_area
-  )
-  
-  mc_global_year <- make_mc_global_year(
-    mc_region_biome_year = mc_region_biome_year,
-    region_biome_area = region_biome_area
-  )
-  
-  saveRDS(
+  region_biome_area[
     mc_region_biome_year,
-    file.path(
-      PATH_OUTPUT_DATA,
-      paste0("mc_region_biome_year_", run_id, ".Rds")
+    on = .(
+      region,
+      biome
     )
-  )
-  
-  saveRDS(
-    mc_region_year,
-    file.path(
-      PATH_OUTPUT_DATA,
-      paste0("mc_region_year_", run_id, ".Rds")
+  ][
+    ,
+    .(
+      prec = weighted_mean_safe(
+        prec,
+        area_weight
+      ),
+      evap = weighted_mean_safe(
+        evap,
+        area_weight
+      )
+    ),
+    by = .(
+      sim,
+      scenario,
+      region,
+      year
     )
-  )
-  
-  saveRDS(
-    mc_global_year,
-    file.path(
-      PATH_OUTPUT_DATA,
-      paste0("mc_global_year_", run_id, ".Rds")
-    )
-  )
-  
-  cat("\nSaved aggregated outputs for run:", run_id, "\n")
-  
-  cat("\nRegion x biome annual output structure:\n")
-  str(mc_region_biome_year)
-  
-  cat("\nIPCC region annual output structure:\n")
-  str(mc_region_year)
-  
-  cat("\nGlobal annual output structure:\n")
-  str(mc_global_year)
-  
-  cat("\nGlobal annual output preview:\n")
-  print(
-    mc_global_year[
-      order(sim, scenario, year)
-    ][
-      1:30
-    ]
-  )
-  
-  cat("\nMissing values in region x biome annual output:\n")
-  print(
-    mc_region_biome_year[
-      ,
-      .(
-        n_missing_prec = sum(!is.finite(prec)),
-        n_missing_evap = sum(!is.finite(evap))
-      )
-    ]
-  )
-  
-  cat("\nMissing values in IPCC region annual output:\n")
-  print(
-    mc_region_year[
-      ,
-      .(
-        n_missing_prec = sum(!is.finite(prec)),
-        n_missing_evap = sum(!is.finite(evap))
-      )
-    ]
-  )
-  
-  cat("\nMissing values in global annual output:\n")
-  print(
-    mc_global_year[
-      ,
-      .(
-        n_missing_prec = sum(!is.finite(prec)),
-        n_missing_evap = sum(!is.finite(evap))
-      )
-    ]
-  )
-  
-  data.table(
-    run_id = run_id,
-    n_sims = mc_selection[, uniqueN(sim)],
-    n_scenarios = mc_selection[, uniqueN(scenario)],
-    n_region_biome_rows = nrow(mc_region_biome_year),
-    n_region_rows = nrow(mc_region_year),
-    n_global_rows = nrow(mc_global_year),
-    n_missing_region_biome_prec = mc_region_biome_year[
-      ,
-      sum(!is.finite(prec))
-    ],
-    n_missing_region_biome_evap = mc_region_biome_year[
-      ,
-      sum(!is.finite(evap))
-    ],
-    n_missing_region_prec = mc_region_year[
-      ,
-      sum(!is.finite(prec))
-    ],
-    n_missing_region_evap = mc_region_year[
-      ,
-      sum(!is.finite(evap))
-    ],
-    n_missing_global_prec = mc_global_year[
-      ,
-      sum(!is.finite(prec))
-    ],
-    n_missing_global_evap = mc_global_year[
-      ,
-      sum(!is.finite(evap))
-    ]
-  )
+  ]
 }
+
+
+make_mc_global_year <- function(
+    mc_region_biome_year,
+    region_biome_area
+) {
+  
+  # Aggregate directly from region-biome values so regional averages are not
+  # averaged a second time.
+  
+  region_biome_area[
+    mc_region_biome_year,
+    on = .(
+      region,
+      biome
+    )
+  ][
+    ,
+    .(
+      prec = weighted_mean_safe(
+        prec,
+        area_weight
+      ),
+      evap = weighted_mean_safe(
+        evap,
+        area_weight
+      )
+    ),
+    by = .(
+      sim,
+      scenario,
+      year
+    )
+  ]
+}
+
 
 # Analysis ====================================================================
 
 region_biome_area <- prepare_region_biome_area(
-  twc_grid_classes = twc_grid_classes
+  grid_classes
 )
 
-aggregation_summary <- rbindlist(
-  lapply(RUN_IDS, function(run_id) {
-    
-    aggregate_one_run(
-      run_id = run_id,
-      dataset_region_biome_year = dataset_region_biome_year,
-      region_biome_area = region_biome_area
-    )
-  })
+mc_region_biome_year <- make_mc_region_biome_year(
+  dataset_region_biome_year,
+  mc_selection
 )
+
+mc_region_year <- make_mc_region_year(
+  mc_region_biome_year,
+  region_biome_area
+)
+
+mc_global_year <- make_mc_global_year(
+  mc_region_biome_year,
+  region_biome_area
+)
+
 
 # Outputs =====================================================================
 
-saveRDS(
-  aggregation_summary,
+write_fst(
+  mc_region_biome_year,
   file.path(
-    PATH_OUTPUT_DATA,
-    "mc_aggregation_summary.Rds"
+    PATH_OUTPUT_OUTPUT,
+    "mc_region_biome_year_scenarios.fst"
   )
 )
 
-# Validation ==================================================================
+saveRDS(
+  mc_region_year,
+  file.path(
+    PATH_OUTPUT_OUTPUT,
+    "mc_region_year_scenarios.Rds"
+  )
+)
 
-cat("\nFinished all Monte Carlo aggregations.\n")
+saveRDS(
+  mc_global_year,
+  file.path(
+    PATH_OUTPUT_OUTPUT,
+    "mc_global_year_scenarios.Rds"
+  )
+)
 
-cat("\nAggregation summary:\n")
-print(aggregation_summary)
+
+# Summary =====================================================================
+
+cat(
+  "\nFinished 100 x 10 Monte Carlo scenario aggregation.\n"
+)
+
+cat(
+  "Simulations: ",
+  uniqueN(mc_selection$sim),
+  "\nScenarios: ",
+  uniqueN(mc_selection$scenario),
+  "\n",
+  sep = ""
+)
+
+print(
+  data.table(
+    output = c(
+      "region_biome_year",
+      "region_year",
+      "global_year"
+    ),
+    n_rows = c(
+      nrow(mc_region_biome_year),
+      nrow(mc_region_year),
+      nrow(mc_global_year)
+    )
+  )
+)
