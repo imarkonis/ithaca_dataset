@@ -4,9 +4,9 @@ source("code/_source.R")
 
 # Inputs =======================================================================
 
-prec_evap_stats <- readRDS(file.path(PATH_OUTPUT_DATA, 'prec_evap_stats.Rds'))
-pet_mean <- readRDS(file.path(PATH_OUTPUT_DATA, 'pet_mean.Rds'))
-dataset_ranks <- readRDS(file.path(PATH_OUTPUT_DATA, 'dataset_ranks.Rds'))
+prec_evap_stats <- readRDS(file.path(PATH_OUTPUT_OUTPUT, 'prec_evap_stats.Rds'))
+pet_mean <- readRDS(file.path(PATH_OUTPUT_OUTPUT, 'pet_mean.Rds'))
+dataset_ranks <- readRDS(file.path(PATH_OUTPUT_OUTPUT, 'dataset_ranks.Rds'))
 
 # Constants & Variables ========================================================
 
@@ -27,7 +27,7 @@ dataset_ranks <- dataset_ranks[pet_check,
 
 # Output =======================================================================
 
-saveRDS(dataset_ranks, file.path(PATH_OUTPUT_DATA, 'dataset_ranks.Rds'))    
+saveRDS(dataset_ranks, file.path(PATH_OUTPUT_OUTPUT, 'dataset_ranks.Rds'))    
 
 # Validation ===================================================================
 

@@ -4,8 +4,8 @@ source("code/_source.R")
 
 # Inputs =======================================================================
 
-prec_evap_stats <- readRDS(file.path(PATH_OUTPUT_DATA, 'prec_evap_stats.Rds'))
-dataset_ranks <- readRDS(file.path(PATH_OUTPUT_DATA, 'dataset_ranks.Rds'))
+prec_evap_stats <- readRDS(file.path(PATH_OUTPUT_OUTPUT, 'prec_evap_stats.Rds'))
+dataset_ranks <- readRDS(file.path(PATH_OUTPUT_OUTPUT, 'dataset_ranks.Rds'))
 
 
 # Constants & Variables ========================================================
@@ -28,7 +28,7 @@ dataset_ranks <- merge(dataset_ranks,
 
 # Output =======================================================================
 
-saveRDS(dataset_ranks, file.path(PATH_OUTPUT_DATA, 'dataset_ranks.Rds'))    
+saveRDS(dataset_ranks, file.path(PATH_OUTPUT_OUTPUT, 'dataset_ranks.Rds'))    
 
 # Validation ===================================================================
 
