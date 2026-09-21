@@ -16,10 +16,10 @@
 # Outputs: merra2_mswx_pet_mm_1980_2024_yearly.fst, written to
 #          PATH_OUTPUT_RAW_OTHER
 # ============================================================================
-source(file.path("code", "00_initialize.R"))
 
-library(data.table)
-library(fst)
+
+# Libraries ==================================================================
+source("code/_source.R")
 
 # Constants & Variables ======================================================
 INPUT_FILES <- c( "merra2" = "merra2_pet-forcing_mixed_1980_2024_025_monthly.fst", 

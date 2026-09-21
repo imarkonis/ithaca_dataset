@@ -15,11 +15,12 @@
 # Outputs: the .fst tables listed in OUTPUT_FILES, written to
 #          PATH_OUTPUT_RAW_OTHER
 # ============================================================================
-source(file.path("code", "00_initialize.R"))
 
-library(data.table)
+
+# Libraries ==================================================================
+source("code/_source.R")
+
 library(terra)
-library(fst)
 
 # Constants & Variables ======================================================
 PERIOD_FIRST_YEAR <- 1980
