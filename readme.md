@@ -181,6 +181,39 @@ When editing scripts:
 * we add simple validation checks where possible;
 * we do not change methodology-critical constants without an issue;
 
+## Local data path
+
+The pipeline's output folder (raw/input/output data, figures, tables) lives outside the repo and is machine-specific: every contributor points it at wherever they keep data on their own computer. This is configured in exactly one place, `code/_machine_paths.R`, which both `code/00a_initialize.R` (creates the folder structure) and `code/_source.R` (sourced by every other script) read `PATH_SAVE` from. Do not hard-code a path directly in either of those two files, or anywhere else in `code/` -- a literal drive letter or `Users/<name>` path is exactly the drift `_machine_paths.R` exists to prevent (an earlier version had `00a_initialize.R` and `_source.R` each hard-coding a different path, which had silently gone out of sync).
+
+`_machine_paths.R` holds a small lookup table plus one "active" switch:
+
+```r
+MACHINE_PATHS <- data.frame(
+  name = c("markonis_noa",
+           "markonis_home"),
+  path = c("D:/research/",
+           "C:/Users/markonis/Documents/Data/"),
+  stringsAsFactors = FALSE
+)
+
+ACTIVE_MACHINE <- "markonis_home"  # <-- change this when switching computers
+```
+
+To run the pipeline on a new computer (human or agent):
+
+1. Add a row to `MACHINE_PATHS` with a short `name` for the machine and the local `path` under which `ithaca_dataset/` should be created, for example:
+
+   ```r
+   MACHINE_PATHS <- data.frame(
+     name = c("markonis_noa", "markonis_home", "yourname_laptop"),
+     path = c("D:/research/", "C:/Users/markonis/Documents/Data/", "/home/yourname/data/"),
+     stringsAsFactors = FALSE
+   )
+   ```
+
+2. Set `ACTIVE_MACHINE <- "yourname_laptop"`.
+3. Run `code/00a_initialize.R` once. It creates the folder structure under that path and saves `paths.Rdata`, which every other script then loads via `_source.R`.
+
 ## Working with manuscript text
 
 Manuscript text should be developed in:

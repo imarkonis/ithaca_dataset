@@ -6,13 +6,15 @@
 # to paths.Rdata for downstream scripts.
 # ============================================================================
 
-# Constants & Variables ======================================================
+# Libraries ==================================================================
 
-PATH_SAVE <-  "C:/Users/markonis/Documents/Data/" # Change this to the local path for saving the script output 
+source("code/_machine_paths.R") # defines PATH_SAVE for this machine (see MACHINE_PATHS / ACTIVE_MACHINE there)
+
+# Constants & Variables ======================================================
 
 if (!dir.exists(dirname(PATH_SAVE))) {
   stop("Parent folder '", dirname(PATH_SAVE), "' does not exist. ",
-       "Edit PATH_SAVE at the top of this script.", call. = FALSE)
+       "Edit ACTIVE_MACHINE (or add a MACHINE_PATHS row) in code/_machine_paths.R.", call. = FALSE)
 }
 
 PATH_OUTPUT <- file.path(PATH_SAVE, "ithaca_dataset")

@@ -2,8 +2,9 @@ library(data.table)
 library(ggplot2)
 library(fst)
 
-load(file.path("D:/research", # Change this to the local path for saving the script output 
-     'ithaca_dataset/paths.Rdata')) 
+source("code/_machine_paths.R") # defines PATH_SAVE for this machine (see MACHINE_PATHS / ACTIVE_MACHINE there)
+
+load(file.path(PATH_SAVE, "ithaca_dataset", "paths.Rdata"))
 
 # Datasets
 PREC_NAMES_SHORT <- c('ERA5L', "FLDAS", "MERRA", "TERRA", "MSWEP")
