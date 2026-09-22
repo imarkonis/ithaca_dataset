@@ -1062,7 +1062,10 @@ write_scenario(
 )
 
 
-# Manifest ====================================================================
+# Outputs =====================================================================
+# The 200 NetCDF ensemble members themselves are written above, incrementally
+# during Analysis (see the file header note on batched writing); this is the
+# manifest of what that step produced.
 
 manifest <- CJ(
   scenario = PUBLIC_SCENARIOS,
@@ -1092,6 +1095,11 @@ fwrite(
   )
 )
 
+
+# Validation ==================================================================
+
+manifest_paths <- file.path(PATH_OUTPUT_DATASET, manifest$file)
+stopifnot(all(file.exists(manifest_paths)))
 
 # Summary =====================================================================
 

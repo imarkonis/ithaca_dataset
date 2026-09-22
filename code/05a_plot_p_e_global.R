@@ -1051,6 +1051,13 @@ saveRDS(
 )
 
 
+# Validation ==================================================================
+
+stopifnot(nrow(dataset_scope_mean) > 0)
+stopifnot(nrow(mc_scope_mean) > 0)
+stopifnot(nrow(dataset_scope_change) > 0)
+stopifnot(nrow(mc_scope_change) > 0)
+
 # Summary =====================================================================
 
 cat(

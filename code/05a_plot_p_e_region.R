@@ -988,6 +988,13 @@ saveRDS(
 )
 
 
+# Validation ==================================================================
+
+stopifnot(nrow(dataset_region_mean) > 0)
+stopifnot(nrow(mc_region_mean) > 0)
+stopifnot(nrow(dataset_region_change) > 0)
+stopifnot(nrow(mc_region_change) > 0)
+
 # Summary =====================================================================
 
 cat(

@@ -258,6 +258,12 @@ saveRDS(
 )
 
 
+# Validation ==================================================================
+
+stopifnot(nrow(mc_region_biome_year) > 0)
+stopifnot(nrow(mc_region_year) > 0)
+stopifnot(nrow(mc_global_year) > 0)
+
 # Summary =====================================================================
 
 cat(

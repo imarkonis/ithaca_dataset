@@ -116,7 +116,7 @@ read_nc_as_data_table <- function(nc_path, value_name) {
   variable_table[]
 }
 
-# Analysis ===================================================================
+# Inputs ======================================================================
 # Every input is checked first, so a missing file stops the run in seconds
 # instead of after an hour of conversion work.
 required_paths <- file.path(PATH_OUTPUT_RAW_OTHER, unlist(FORCING_FILES))
@@ -125,6 +125,8 @@ if (length(missing_paths) > 0) {
   stop("Missing NetCDF inputs:\n  ",
        paste(missing_paths, collapse = "\n  "), call. = FALSE)
 }
+
+# Analysis ===================================================================
 
 forcing_tables <- vector("list", length(FORCING_FILES))
 names(forcing_tables) <- names(FORCING_FILES)

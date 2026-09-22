@@ -63,13 +63,15 @@ HAMON_COEFFICIENT <- 0.1651 * 216.7
 ENERGY_ONLY_COEFFICIENT <- 0.8
 PRIESTLEY_TAYLOR_ALPHA <- 1.26
 
-# Analysis ===================================================================
+# Inputs ======================================================================
 required_paths <- file.path(PATH_OUTPUT_RAW_OTHER, INPUT_FILES)
 missing_paths <- required_paths[!file.exists(required_paths)]
 if (length(missing_paths) > 0) {
   stop("Missing forcing tables, run 01c_prepare_pet_forcing.R first:\n  ",
        paste(missing_paths, collapse = "\n  "), call. = FALSE)
 }
+
+# Analysis ===================================================================
 
 pet_tables <- vector("list", length(INPUT_FILES))
 names(pet_tables) <- names(INPUT_FILES)

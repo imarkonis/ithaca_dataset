@@ -1,8 +1,12 @@
+# Libraries ==================================================================
+
 library(data.table)
 library(ggplot2)
 library(fst)
 
 source("code/_machine_paths.R") # defines PATH_SAVE for this machine (see MACHINE_PATHS / ACTIVE_MACHINE there)
+
+# Inputs =======================================================================
 
 load(file.path(PATH_SAVE, "ithaca_dataset", "paths.Rdata"))
 
