@@ -5,7 +5,7 @@ source("code/_source.R")
 # Inputs =======================================================================
 
 prec_evap_stats <- readRDS(file.path(PATH_OUTPUT_OUTPUT, 'prec_evap_stats.Rds'))
-pet_mean <- readRDS(file.path(PATH_OUTPUT_OUTPUT, 'pet_mean.Rds'))
+pet_mean <- read_fst(file.path(PATH_OUTPUT_OUTPUT, 'pet_mean.fst'), as.data.table = TRUE)
 dataset_ranks <- readRDS(file.path(PATH_OUTPUT_OUTPUT, 'dataset_ranks.Rds'))
 
 # Constants & Variables ========================================================

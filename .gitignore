@@ -7,3 +7,6 @@
 ithaca_dataset.Rproj
 #code\00_initialize.R
 #code\_source
+
+# Disposable output of tools/check_static.R, regenerated on every run.
+tools/verification/
