@@ -9,7 +9,7 @@
 #   3. saves the aggregated object for Monte Carlo sampling
 #
 # Grid-cell area weights, IPCC regions, biome classes, and the common analysis
-# grid are defined upstream in twc_grid_classes.Rds.
+# grid are defined upstream in grid_classes.Rds.
 # ============================================================================
 
 # Libraries ==================================================================
@@ -26,7 +26,7 @@ prec_evap <- read_fst(
 )
 
 grid_classes <- readRDS(
-  file.path(PATH_OUTPUT_OUTPUT, "twc_grid_classes.Rds")
+  file.path(PATH_OUTPUT_OUTPUT, "grid_classes.Rds")
 )
 
 # Constants & Variables ======================================================
