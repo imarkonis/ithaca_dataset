@@ -416,13 +416,29 @@ hex_polygons[, winner := factor(winner, levels = CANDIDATES)]
 hex_labels <- unique(hex_polygons[, .(Acronym, V1, V2, winner)])
 hex_labels[, text_colour := label_colour(PAL_DATASETS[as.character(winner)])]
 
+# Build the dataset legend independently of the regional winners so that all
+# five candidates retain a swatch even when one of them wins no region.
+dataset_legend_keys <- data.table(
+  winner = factor(CANDIDATES, levels = CANDIDATES),
+  x = mean(range(hex_polygons$long)),
+  y = mean(range(hex_polygons$lat))
+)
+
 dataset_fill <- scale_fill_cat(
   name = "Dataset",
   values = PAL_DATASETS,
   breaks = CANDIDATES,
   limits = CANDIDATES,
   labels = DATASET_LABELS[CANDIDATES],
-  drop = FALSE
+  drop = FALSE,
+  guide = guide_legend(
+    override.aes = list(
+      alpha = 1,
+      shape = 22,
+      colour = NA,
+      size = FIG_POINT_SIZE
+    )
+  )
 )
 
 p_hex <- ggplot() +
@@ -430,7 +446,17 @@ p_hex <- ggplot() +
     data = hex_polygons,
     aes(x = long, y = lat, group = group, fill = winner),
     colour = COL_WHITE,
-    linewidth = FIG_BOUNDARY_LINEWIDTH
+    linewidth = FIG_BOUNDARY_LINEWIDTH,
+    show.legend = FALSE
+  ) +
+  geom_point(
+    data = dataset_legend_keys,
+    aes(x = x, y = y, fill = winner),
+    shape = 22,
+    alpha = 0,
+    size = FIG_POINT_SIZE,
+    inherit.aes = FALSE,
+    show.legend = TRUE
   ) +
   geom_text(
     data = hex_labels,
