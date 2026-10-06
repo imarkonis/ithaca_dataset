@@ -64,18 +64,18 @@ MIN_RANK_COMPONENTS <- 4L
 FIGURE_HEIGHT_MM <- 105
 
 DATASET_LABELS <- c(
-  ERA5L = "ERA5-Land",
+  ERA5L = "ERA5L",
   FLDAS = "FLDAS",
   GLEAM = "GLEAM",
-  MERRA = "MERRA-2",
-  TERRA = "TerraClimate"
+  MERRA = "MERRA2",
+  TERRA = "TERRA"
 )
 DATASET_AXIS_LABELS <- c(
-  ERA5L = "ERA5-Land",
+  ERA5L = "ERA5L",
   FLDAS = "FLDAS",
   GLEAM = "GLEAM",
-  MERRA = "MERRA-2",
-  TERRA = "TerraClimate"
+  MERRA = "MERRA2",
+  TERRA = "TERRA"
 )
 
 # Use only cells in which all five candidates are ranked, so that every rank is
