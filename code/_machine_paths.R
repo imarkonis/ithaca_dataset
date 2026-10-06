@@ -16,7 +16,7 @@ MACHINE_PATHS <- data.frame(
   stringsAsFactors = FALSE
 )
 
-ACTIVE_MACHINE <- "markonis_home"  # <-- change this when switching computers
+ACTIVE_MACHINE <- "markonis_noa"  # <-- change this when switching computers
 
 PATH_SAVE <- MACHINE_PATHS$path[MACHINE_PATHS$name == ACTIVE_MACHINE]
 
