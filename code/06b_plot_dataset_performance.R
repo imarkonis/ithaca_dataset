@@ -63,6 +63,21 @@ MIN_RANK_COMPONENTS <- 4L
 # Final ESSD/Copernicus figure height. Width comes from the active journal profile.
 FIGURE_HEIGHT_MM <- 105
 
+DATASET_LABELS <- c(
+  ERA5L = "ERA5-Land",
+  FLDAS = "FLDAS",
+  GLEAM = "MSWEP-GLEAM",
+  MERRA = "MERRA-2",
+  TERRA = "TerraClimate"
+)
+DATASET_AXIS_LABELS <- c(
+  ERA5L = "ERA5-Land",
+  FLDAS = "FLDAS",
+  GLEAM = "MSWEP-\nGLEAM",
+  MERRA = "MERRA-2",
+  TERRA = "TerraClimate"
+)
+
 # Use only cells in which all five candidates are ranked, so that every rank is
 # on the same 1-5 scale.
 REQUIRE_ALL_CANDIDATES <- TRUE
@@ -332,6 +347,13 @@ label_colour <- function(fill) {
   ifelse(luminance < 0.55, COL_WHITE, COL_BLACK)
 }
 
+rank_text_colour <- function(rank, limits) {
+  palette <- fig_colours("seq_default", n = 256)
+  clipped <- pmin(pmax(rank, limits[1]), limits[2])
+  index <- round(scales::rescale(clipped, to = c(1, 256), from = limits))
+  label_colour(palette[index])
+}
+
 # Analysis ===================================================================
 
 ranked <- overall_rank(dataset_ranks)
@@ -379,6 +401,14 @@ heat_ranks[
 # Best candidate within every biome row, for the outline.
 heat_best <- heat_ranks[, .SD[which.min(mean_rank)], by = biome]
 
+# Derived-data validation before any figure is rendered.
+stopifnot(
+  nrow(ranked) > 0L,
+  ranked[, all(overall >= 1 & overall <= length(CANDIDATES))],
+  region_ranks[, uniqueN(dataset), by = region][, all(V1 == length(CANDIDATES))],
+  all(is.finite(heat_ranks$mean_rank))
+)
+
 # Hexagon map ------------------------------------------------------------------------
 
 hex_layout <- load_hexagons(HEX_LAYOUT_FILES, grid_classes)
@@ -423,6 +453,7 @@ dataset_fill <- scale_fill_cat(
   name = "Dataset",
   values = PAL_DATASETS,
   limits = CANDIDATES,
+  labels = DATASET_LABELS,
   drop = FALSE
 )
 
@@ -475,13 +506,8 @@ p_hex <- ggplot() +
 
 # Biome heatmap -------------------------------------------------------------------------
 
-# Text contrast follows the displayed fill: light text on the darker low-rank
-# end of the scale, dark text elsewhere. This is cosmetic only.
-heat_ranks[, text_colour := fifelse(
-  mean_rank < mean(RANK_LIMITS) - 0.35,
-  COL_WHITE,
-  COL_BLACK
-)]
+# Text contrast follows the actual displayed palette after scale saturation.
+heat_ranks[, text_colour := rank_text_colour(mean_rank, RANK_LIMITS)]
 
 best_key <- "Best dataset in row"
 
@@ -522,7 +548,7 @@ p_heat <- ggplot(heat_ranks, aes(x = dataset, y = biome)) +
     breaks = seq(RANK_LIMITS[1], RANK_LIMITS[2], by = 0.5),
     labels = label_minus
   ) +
-  scale_x_discrete(position = "top") +
+  scale_x_discrete(position = "top", labels = DATASET_AXIS_LABELS) +
   facet_grid(block ~ ., scales = "free_y", space = "free_y") +
   labs(x = NULL, y = NULL) +
   theme_pub(legend_position = "bottom") +
@@ -577,16 +603,12 @@ caption <- paste0(
   layout_sentence,
   "(b) Area-weighted mean performance rank by biome and for all land; rank 1 is ",
   "best and rank 5 worst. The outlined cell is the lowest mean rank in each row. ",
-  "The heatmap is displayed over ranks ", RANK_LIMITS[1], "-", RANK_LIMITS[2],
+  "The heatmap is displayed over ranks ", RANK_LIMITS[1], "\u2013", RANK_LIMITS[2],
   "; values outside this range are shown with the corresponding end colour."
 )
 writeLines(caption, paste0(figure_stem, "_caption.txt"))
 
-# Validation =================================================================
-
-# Ranks are on the 1-5 scale and every dataset is present in every region.
-stopifnot(ranked[, all(overall >= 1 & overall <= length(CANDIDATES))])
-stopifnot(region_ranks[, uniqueN(dataset), by = region][, all(V1 == length(CANDIDATES))])
+# Data QA ====================================================================
 
 # Within a cell the five overall ranks average to 3 (ranks are a permutation of
 # 1-5 per component, apart from ties and missing components).
