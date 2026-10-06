@@ -147,6 +147,7 @@ COL_GRID_MAJOR <- "#DEDEDE"
 COL_MISSING    <- "#D9D9D9"
 COL_FACET_BG   <- "#F2F2F2"
 COL_WHITE      <- "#FFFFFF"
+COL_BLACK      <- "#000000"
 
 # -----------------------------------------------------------------------------
 # 5. Semantic colours (manuscript-wide meanings; use the names in scripts)
@@ -158,12 +159,12 @@ COL_BALANCE   <- "#009E73"   # bluish green: P - E, balance terms
 COL_HIGHLIGHT <- "#CC79A7"   # reddish purple: focal element
 
 # -----------------------------------------------------------------------------
-# 6. Categorical palettes (Okabe-Ito)
+# 6. Categorical palettes (ITHACA graphics.R; optional Okabe-Ito)
 # -----------------------------------------------------------------------------
 # More than 8 important categories: change the encoding (facets, direct
 # labels, grey-out), do not invent colours.
 
-PAL_CAT_8 <- c(
+PAL_OKABE_ITO <- c(
   "#0072B2", # blue
   "#E69F00", # orange
   "#009E73", # bluish green
@@ -173,7 +174,36 @@ PAL_CAT_8 <- c(
   "#F0E442", # yellow (weak on white: avoid for thin lines and small points)
   "#333333"  # dark neutral
 )
-PAL_CAT_6 <- PAL_CAT_8[1:6]
+# Project default, copied from imarkonis/ithaca/source/graphics.R (colset_mid).
+# Fixed values, not fetched over the network when a figure is run.
+colset_mid <- c(
+  "#4D648D", "#337BAE", "#97B8C2", "#739F3D", "#ACBD78",
+  "#F4CC70", "#EBB582", "#BF9A77", "#E38B75", "#CE5A57",
+  "#CA3433", "#785A46"
+)
+PAL_MAIN <- colset_mid
+PAL_CAT_8 <- PAL_MAIN[1:8]
+PAL_CAT_6 <- PAL_MAIN[1:6]
+PAL_DATASETS <- setNames(PAL_MAIN[1:5], c("ERA5L", "FLDAS", "GLEAM", "MERRA", "TERRA"))
+PAL_ITHACA_DATASETS <- PAL_DATASETS
+
+# Exact named biome palette from graphics.R. Its unnamed short palette includes
+# an out-of-range index (13), so use the complete named colset_biome instead.
+colset_biome <- c(
+  "B. Forests" = "#4D648D", "Deserts" = "#EBB582", "Flooded" = "#337BAE",
+  "Mangroves" = "#064470", "M. Grasslands" = "#D24136", "Mediterranean" = "#F4CC70",
+  "T. Coni. Forests" = "#32520B", "T. BL Forests" = "#739F3D", "T. Grasslands" = "#785A46",
+  "T/S Coni. Forests" = "#576b16", "T/S Dry BL Forests" = "#ACBD78",
+  "T/S Moist BL Forests" = "#97BA23", "T/S Grasslands" = "#E38B75", "Tundra" = "#97B8C2"
+)
+# Explicit aliases for the coarser classes used by pRecipe's biome_short_class.
+# Water takes the source palette's dark aquatic (Mangroves) colour.
+PAL_BIOMES <- c(colset_biome,
+  "T. Forests" = unname(colset_biome["T. BL Forests"]),
+  "T/S Forests" = unname(colset_biome["T/S Moist BL Forests"]),
+  "Water" = unname(colset_biome["Mangroves"]),
+  "Polar" = unname(colset_biome["Tundra"])
+)
 
 PAL_WATER_COMPONENTS <- c("P" = COL_PRECIP, "E" = COL_EVAP, "P-E" = COL_BALANCE)
 
@@ -218,6 +248,10 @@ FIG_LINEWIDTH_REF      <- pt_to_lw(0.4)    # zero/reference lines
 FIG_AXIS_LINEWIDTH     <- pt_to_lw(0.35)   # axes and ticks
 FIG_GRID_LINEWIDTH     <- pt_to_lw(0.25)   # major gridlines
 FIG_BOUNDARY_LINEWIDTH <- pt_to_lw(0.25)   # coastlines, borders
+FIG_DRAW_LINEWIDTH     <- pt_to_lw(1.0)    # selected MC draw on a weight bar
+FIG_BAR_HALF_HEIGHT    <- 0.4             # categorical-axis units
+FIG_LABEL_PADDING     <- 0.25            # ggrepel text padding in lines
+FIG_LABEL_FORCE       <- 1
 
 FIG_POINT_SIZE       <- 1.2    # ggplot2 size; ~1 mm marker
 FIG_POINT_SIZE_SMALL <- 0.6
@@ -261,6 +295,7 @@ theme_pub <- function(base_size = FIG_BASE_SIZE, base_family = FIG_FONT,
       axis.ticks        = ggplot2::element_line(colour = COL_AXIS, linewidth = FIG_AXIS_LINEWIDTH),
       axis.ticks.length = grid::unit(FIG_TICK_LENGTH_MM, "mm"),
       legend.position   = legend_position,
+      legend.box        = "vertical", # separate guide blocks instead of clipping side by side
       legend.title      = ggplot2::element_text(size = FIG_LEGEND_TITLE_SIZE, colour = COL_TEXT),
       legend.text       = ggplot2::element_text(size = FIG_LEGEND_TEXT_SIZE, colour = COL_TEXT),
       legend.key        = ggplot2::element_blank(),
@@ -341,10 +376,10 @@ check_limits <- function(x, limits, what = deparse(substitute(x))) {
 }
 
 # Categorical ----------------------------------------------------------------
-scale_colour_cat <- function(..., values = PAL_CAT_8, na.value = COL_MISSING) {
+scale_colour_cat <- function(..., values = PAL_MAIN, na.value = COL_MISSING) {
   ggplot2::scale_colour_manual(..., values = values, na.value = na.value)
 }
-scale_fill_cat <- function(..., values = PAL_CAT_8, na.value = COL_MISSING) {
+scale_fill_cat <- function(..., values = PAL_MAIN, na.value = COL_MISSING) {
   ggplot2::scale_fill_manual(..., values = values, na.value = na.value)
 }
 
