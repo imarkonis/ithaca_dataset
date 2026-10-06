@@ -322,20 +322,20 @@ stopifnot(evap_summary[, all(n_pos + n_neg <= n_sig & n_sig <= n_ref)])
 
 p_mean_prec <- publication_map(
   prec_map, "spread_mean",
-  spread_scale("Long-term mean spread\n(IQR / |median|)")
+  spread_scale("Long-term mean spread")
 )
 p_mean_evap <- publication_map(
   evap_map, "spread_mean",
-  spread_scale("Long-term mean spread\n(IQR / |median|)")
+  spread_scale("Long-term mean spread")
 )
 
 p_sd_prec <- publication_map(
   prec_map, "spread_sd",
-  spread_scale("Interannual SD spread\n(IQR / |median|)")
+  spread_scale("Interannual SD spread")
 )
 p_sd_evap <- publication_map(
   evap_map, "spread_sd",
-  spread_scale("Interannual SD spread\n(IQR / |median|)")
+  spread_scale("Interannual SD spread")
 )
 
 direction_scale <- category_scale(
@@ -384,7 +384,7 @@ check_limits(
 
 # Outputs ====================================================================
 
-figure_stem <- file.path(PATH_OUTPUT_FIGURES, "fig02_input_disagreement")
+figure_stem <- file.path(PATH_OUTPUT_FIGURES, "fig03_input_disagreement")
 quiet_raster_gaps(
   save_figure(
     figure_2,
