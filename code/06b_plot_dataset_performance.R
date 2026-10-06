@@ -66,14 +66,14 @@ FIGURE_HEIGHT_MM <- 105
 DATASET_LABELS <- c(
   ERA5L = "ERA5-Land",
   FLDAS = "FLDAS",
-  GLEAM = "MSWEP-GLEAM",
+  GLEAM = "GLEAM",
   MERRA = "MERRA-2",
   TERRA = "TerraClimate"
 )
 DATASET_AXIS_LABELS <- c(
   ERA5L = "ERA5-Land",
   FLDAS = "FLDAS",
-  GLEAM = "MSWEP-\nGLEAM",
+  GLEAM = "GLEAM",
   MERRA = "MERRA-2",
   TERRA = "TerraClimate"
 )

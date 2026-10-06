@@ -183,11 +183,9 @@ colset_mid <- c(
 )
 colset_mid_qual <- colset_mid[c(11, 2, 4, 6,  1, 8, 10, 5, 7, 3, 9, 12)]
 
-PAL_MAIN <- colset_mid_qual
-PAL_CAT_8 <- PAL_MAIN[1:8]
-PAL_CAT_6 <- PAL_MAIN[1:6]
-PAL_DATASETS <- setNames(PAL_MAIN[1:5], c("ERA5L", "FLDAS", "GLEAM", "MERRA", "TERRA"))
-PAL_ITHACA_DATASETS <- PAL_DATASETS
+PAL_CAT_8 <- colset_mid_qual[1:8]
+PAL_CAT_6 <- colset_mid_qual[1:6]
+PAL_DATASETS <- setNames(colset_mid[c(3, 5, 6, 8, 10)], c("GLEAM", "TERRA", "FLDAS", "ERA5L", "MERRA"))
 
 # Exact named biome palette from graphics.R. Its unnamed short palette includes
 # an out-of-range index (13), so use the complete named colset_biome instead.
