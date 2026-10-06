@@ -25,7 +25,7 @@ VALUE_TOLERANCE <- 1e-8
 GRID_RESOLUTION <- 0.25
 MAP_PADDING <- 1 # degrees, context around the full MED grid
 FIGURE_HEIGHT_MM <- 150
-EXAMPLE_STEM <- paste0("figS_sampling_unit_", tolower(EXAMPLE_REGION), "_", EXAMPLE_SCENARIO)
+EXAMPLE_STEM <- paste0("fig2_sampling_unit_", tolower(EXAMPLE_REGION), "_", EXAMPLE_SCENARIO)
 BIOME_ORDER <- c(
   "Polar", "Tundra", "B. Forests", "T. Forests", "T. Grasslands",
   "M. Grasslands", "Mediterranean", "Deserts", "T/S Grasslands",
@@ -225,7 +225,6 @@ figure_components <- add_panel_tags(
 
 # Outputs ====================================================================
 
-dir.create(PATH_OUTPUT_FIGURES, recursive = TRUE, showWarnings = FALSE)
 figure_stem <- file.path(PATH_OUTPUT_FIGURES, EXAMPLE_STEM)
 save_figure(figure_example, file_stem = figure_stem,
             width_mm = FIG_WIDTH_DOUBLE, height_mm = FIGURE_HEIGHT_MM)
