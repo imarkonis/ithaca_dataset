@@ -187,6 +187,16 @@ PAL_CAT_8 <- colset_mid_qual[1:8]
 PAL_CAT_6 <- colset_mid_qual[1:6]
 PAL_DATASETS <- setNames(colset_mid[c(3, 5, 6, 8, 10)], c("GLEAM", "TERRA", "FLDAS", "ERA5L", "MERRA"))
 
+# Fixed display names for the five candidate datasets. Keep internal IDs in the
+# data/scales; use these labels in every manuscript figure.
+DATASET_LABELS <- c(
+  ERA5L = "ERA5L",
+  FLDAS = "FLDAS",
+  GLEAM = "GLEAM",
+  MERRA = "MERRA2",
+  TERRA = "TERRA"
+)
+
 # Exact named biome palette from graphics.R. Its unnamed short palette includes
 # an out-of-range index (13), so use the complete named colset_biome instead.
 colset_biome <- c(
