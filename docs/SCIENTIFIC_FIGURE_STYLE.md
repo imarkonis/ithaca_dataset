@@ -2,7 +2,7 @@
 
 **Purpose:** shared visual design system for publication figures.
 
-**Implementation:** every reusable cosmetic constant and helper in this document lives in `figures/_figs.R`. Figure scripts source `_figs.R` and do not recreate the design system.
+**Implementation:** every reusable cosmetic constant and helper in this document lives in `code/_figs.R`. Figure scripts source `_figs.R` and do not recreate the design system.
 
 Scientific transformations, filtering, aggregation, projection choices, uncertainty definitions, colour limits and midpoints, bin breaks and other analytical decisions belong in `SCIENTIFIC_FIGURE_WORKFLOW.md`, not here. The dividing test: *if changing it could change what a reader concludes, it is not cosmetic.*
 
@@ -92,13 +92,6 @@ Fixed neutral colours for text (`COL_TEXT`), axes (`COL_AXIS`), reference lines 
 ---
 
 ## 7. Categorical palette
-
-**ITHACA project override (6 October 2026):** the default `PAL_MAIN` is the
-`colset_mid` palette from `imarkonis/ithaca/source/graphics.R`. `PAL_DATASETS`
-uses its first five colours in the fixed candidate order, and `PAL_BIOMES`
-preserves that file's named biome colours with explicit aliases for the
-coarser pRecipe classes. `PAL_OKABE_ITO` remains available as an alternative.
-All project mappings live in `code/_figs.R`.
 
 Okabe–Ito colour-blind-aware palette for up to eight important categories (`PAL_CAT_8`), in this order: blue, orange, bluish green, vermillion, reddish purple, sky blue, yellow, dark neutral. Yellow is weak on white; avoid it for thin lines and small points.
 
@@ -218,7 +211,12 @@ CRS, projection, masking, interpolation, raster resolution and region definition
 
 ## 18. Export
 
-Use `save_figure(plot, file_stem, width_mm, height_mm, formats = c("pdf", "png"))`:
+Use `save_figure(plot, name, target, width_mm, height_mm, formats = c("pdf", "png"))`:
+
+- `name` is a bare file stem (`"fig03_precip"`, `"figS02_detail"`); the folder comes from `target`:
+  - `"main"` → `manuscript/fig_main/` (figures of the paper, committed);
+  - `"sm"` → `manuscript/fig_sm/` (supplementary figures, committed);
+  - `"local"` (default) → a personal folder outside the repository for exploratory and draft figures, set with `options(figs.local_dir = ...)` in `~/.Rprofile` (default `~/figures_local/<repository>/`);
 
 - vector PDF first, through `cairo_pdf` with the plotmath symbol font mapped to the main font — fonts embedded, text editable, one typeface;
 - PNG preview at 300 dpi (ragg); optional `"tiff"` (LZW, profile raster dpi) and `"svg"`;
@@ -234,7 +232,7 @@ After exporting, run `check_fonts("<file>.pdf")` (one family, all embedded). For
 A normal figure script looks approximately like:
 
 ```r
-source(here::here("figures", "_figs.R"))
+source(here::here("code", "_figs.R"))
 
 p_a <- ggplot(plot_data, aes(year, value, colour = dataset)) +
   geom_hline_ref(0) +
@@ -246,7 +244,7 @@ p_a <- ggplot(plot_data, aes(year, value, colour = dataset)) +
 
 fig_03 <- add_panel_tags(p_a + p_b + plot_layout(widths = c(1.15, 1)))
 
-save_figure(fig_03, here::here("figures", "output", "fig03_example"),
+save_figure(fig_03, "fig03_example", target = "main",
             width_mm = FIG_WIDTH_DOUBLE, height_mm = 75)
 ```
 
@@ -269,7 +267,7 @@ unless the value is genuinely unique to that figure and documented.
 | Instead of | Use | Why |
 |---|---|---|
 | `geom_line(size = 1)` or raw `linewidth = 0.45` | `linewidth = FIG_LINEWIDTH` | `size` for lines is deprecated; the linewidth unit is ≈ 0.75 mm |
-| `ggsave("f.pdf", width = 89)` | `save_figure(p, stem, width_mm, height_mm)` | default unit is inches; `pdf()` does not embed standard fonts |
+| `ggsave("f.pdf", width = 89)` | `save_figure(p, name, target, width_mm, height_mm)` | default unit is inches; `pdf()` does not embed standard fonts |
 | `labs(title = ...)` | the manuscript caption | journals set titles in captions (`theme_pub()` blanks titles) |
 | `"mm yr⁻¹"`, literal `°` in code | plotmath `yr^{-1}`, `"\u00B0"` | missing glyphs and locale-dependent rendering |
 | hyphens in negative tick labels | `labels = label_minus` | typographic minus |
