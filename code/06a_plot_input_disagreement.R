@@ -50,8 +50,16 @@ evap_reference <- read_fst(
   as.data.table = TRUE
 )
 
-grid_classes <- readRDS(
+grid_classes <- as.data.table(readRDS(
   file.path(PATH_OUTPUT_OUTPUT, "grid_classes.Rds")
+))
+
+stopifnot(
+  all(c("lon", "lat", "cell_weight") %in% names(grid_classes)),
+  !anyDuplicated(grid_classes[, .(lon, lat)]),
+  all(is.finite(grid_classes$lon)),
+  all(is.finite(grid_classes$lat)),
+  all(is.finite(grid_classes$cell_weight) & grid_classes$cell_weight > 0)
 )
 
 # Constants & Variables ======================================================
@@ -299,6 +307,17 @@ mask <- grid_classes[, .(lon, lat, cell_weight)]
 prec_map <- merge(mask, prec_summary, by = c("lon", "lat"), all.x = TRUE)
 evap_map <- merge(mask, evap_summary, by = c("lon", "lat"), all.x = TRUE)
 
+# Validation =================================================================
+
+# Both ensembles have the full 8 members, and the mask is the same everywhere.
+stopifnot(prec_summary[, all(n_ref == 8L)], evap_summary[, all(n_ref == 8L)])
+stopifnot(nrow(prec_map) == nrow(mask), nrow(evap_map) == nrow(mask))
+stopifnot(!anyNA(prec_map$n_ref), !anyNA(evap_map$n_ref))
+
+# Counts are bounded by the ensemble size.
+stopifnot(prec_summary[, all(n_pos + n_neg <= n_sig & n_sig <= n_ref)])
+stopifnot(evap_summary[, all(n_pos + n_neg <= n_sig & n_sig <= n_ref)])
+
 # Maps -------------------------------------------------------------------------
 
 p_mean_prec <- publication_map(
@@ -388,16 +407,7 @@ caption <- paste0(
 )
 writeLines(caption, paste0(figure_stem, "_caption.txt"))
 
-# Validation =================================================================
-
-# Both ensembles have the full 8 members, and the mask is the same everywhere.
-stopifnot(prec_summary[, all(n_ref == 8L)], evap_summary[, all(n_ref == 8L)])
-stopifnot(nrow(prec_map) == nrow(mask), nrow(evap_map) == nrow(mask))
-stopifnot(!anyNA(prec_map$n_ref), !anyNA(evap_map$n_ref))
-
-# Counts are bounded by the ensemble size.
-stopifnot(prec_summary[, all(n_pos + n_neg <= n_sig & n_sig <= n_ref)])
-stopifnot(evap_summary[, all(n_pos + n_neg <= n_sig & n_sig <= n_ref)])
+# Data QA ====================================================================
 
 # Area-weighted share of land in each class, for the caption and the text.
 class_share <- function(map_dt, column) {
