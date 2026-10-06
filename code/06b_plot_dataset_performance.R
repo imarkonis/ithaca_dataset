@@ -27,6 +27,7 @@
 
 source("code/_source.R")
 source("code/_figure_helpers.R")
+source("code/_figs.R") # current publication design system; restores modern export helpers
 
 # Inputs =====================================================================
 
@@ -35,18 +36,32 @@ RANK_COLUMNS <- c(
   "evap_mean_rank", "evap_sd_rank", "evap_rank_slope"
 )
 
-dataset_ranks <- readRDS(
+dataset_ranks <- as.data.table(readRDS(
   file.path(PATH_OUTPUT_OUTPUT, "dataset_ranks.Rds")
-)[, c("lon", "lat", "dataset", RANK_COLUMNS), with = FALSE]
-
-grid_classes <- readRDS(
+))
+grid_classes <- as.data.table(readRDS(
   file.path(PATH_OUTPUT_OUTPUT, "grid_classes.Rds")
+))
+
+rank_required <- c("lon", "lat", "dataset", RANK_COLUMNS)
+grid_required <- c("lon", "lat", "region", "biome", "cell_weight")
+stopifnot(
+  all(rank_required %in% names(dataset_ranks)),
+  all(grid_required %in% names(grid_classes)),
+  !anyDuplicated(dataset_ranks[, .(lon, lat, dataset)]),
+  !anyDuplicated(grid_classes[, .(lon, lat)]),
+  all(as.character(dataset_ranks$dataset) %in% CANDIDATES),
+  all(is.finite(grid_classes$cell_weight) & grid_classes$cell_weight > 0)
 )
+dataset_ranks <- dataset_ranks[, ..rank_required]
 
 # Constants & Variables ======================================================
 
 # A cell-dataset needs at least this many of the six ranks to get an overall rank.
 MIN_RANK_COMPONENTS <- 4L
+
+# Final ESSD/Copernicus figure height. Width comes from the active journal profile.
+FIGURE_HEIGHT_MM <- 105
 
 # Use only cells in which all five candidates are ranked, so that every rank is
 # on the same 1-5 scale.
@@ -291,21 +306,30 @@ load_hexagons <- function(files, grid_classes) {
 
   if (length(found) > 0) {
     message("Hexagon layout: ", found[1])
-    return(read_established_hexagons(found[1]))
+    return(list(
+      data = read_established_hexagons(found[1]),
+      source = "established",
+      path = found[1]
+    ))
   }
 
-  message(
+  warning(
     "Hexagon layout file not found (", paste(files, collapse = ", "), "): ",
-    "using a generated layout, NOT the established IPCC hexagons."
+    "using a generated layout, NOT the established IPCC hexagons.",
+    call. = FALSE
   )
 
-  generate_hexagons(grid_classes)
+  list(
+    data = generate_hexagons(grid_classes),
+    source = "generated",
+    path = NA_character_
+  )
 }
 
 # White text on dark fills, black text on light fills.
 label_colour <- function(fill) {
   luminance <- colSums(col2rgb(fill) * c(0.299, 0.587, 0.114)) / 255
-  ifelse(luminance < 0.55, "white", "black")
+  ifelse(luminance < 0.55, COL_WHITE, COL_BLACK)
 }
 
 # Analysis ===================================================================
@@ -357,7 +381,8 @@ heat_best <- heat_ranks[, .SD[which.min(mean_rank)], by = biome]
 
 # Hexagon map ------------------------------------------------------------------------
 
-hexagons <- load_hexagons(HEX_LAYOUT_FILES, grid_classes)
+hex_layout <- load_hexagons(HEX_LAYOUT_FILES, grid_classes)
+hexagons <- hex_layout$data
 
 missing_hexagons <- setdiff(winners$region, hexagons$Acronym)
 
@@ -394,123 +419,168 @@ close_calls[, `:=`(
   runner_up = factor(runner_up, levels = CANDIDATES)
 )]
 
-dataset_fill <- scale_fill_manual(
-  name = "Best-performing dataset",
-  values = DATASET_COLS,
+dataset_fill <- scale_fill_cat(
+  name = "Dataset",
+  values = PAL_DATASETS,
   limits = CANDIDATES,
-  drop = FALSE,
-  guide = guide_legend(nrow = 1, keywidth = unit(0.45, "cm"), keyheight = unit(0.45, "cm"))
+  drop = FALSE
 )
 
-# Legend keys for all five candidates, also those that win no region.
-legend_keys <- data.table(
-  winner = factor(CANDIDATES, levels = CANDIDATES),
-  x = NA_real_,
-  y = NA_real_
+close_call_key <- sprintf(
+  "Runner-up when mean-rank difference < %.2f",
+  CLOSE_CALL_TOLERANCE
 )
 
 p_hex <- ggplot() +
   geom_polygon(
     data = hex_polygons,
     aes(x = long, y = lat, group = group, fill = winner),
-    colour = "white",
-    linewidth = 0.5,
-    show.legend = FALSE
+    colour = COL_WHITE,
+    linewidth = FIG_BOUNDARY_LINEWIDTH
   ) +
   geom_text(
     data = hex_labels,
     aes(x = V1, y = V2, label = Acronym, colour = text_colour),
-    size = 2.7,
-    fontface = "bold"
-  ) +
-  geom_point(
-    data = close_calls,
-    aes(x = dot_x, y = dot_y, fill = runner_up),
-    shape = 21,
-    colour = "white",
-    stroke = 0.5,
-    size = 2.2,
+    family = FIG_FONT,
+    size = FIG_GEOM_TEXT_SIZE,
+    fontface = "bold",
     show.legend = FALSE
   ) +
   geom_point(
-    data = legend_keys,
-    aes(x = x, y = y, fill = winner),
-    shape = 22,
-    size = 4,
-    na.rm = TRUE
+    data = close_calls,
+    aes(x = dot_x, y = dot_y, fill = runner_up, shape = close_call_key),
+    colour = COL_WHITE,
+    stroke = FIG_POINT_STROKE,
+    size = FIG_POINT_SIZE * 1.5,
+    show.legend = c(fill = FALSE, shape = TRUE)
   ) +
   scale_colour_identity() +
-  dataset_fill +
-  coord_equal(expand = FALSE) +
-  labs(
-    caption = paste0(
-      "Lowest mean of the six performance ranks (P and E: mean, SD, slope), area-weighted over each region. ",
-      "Dot: runner-up within ", CLOSE_CALL_TOLERANCE, " mean rank (effectively tied)."
+  scale_shape_manual(
+    name = NULL,
+    values = setNames(21, close_call_key),
+    guide = guide_legend(
+      override.aes = list(fill = COL_CONTEXT, colour = COL_WHITE)
     )
   ) +
-  theme_void(base_size = 8) +
+  dataset_fill +
+  coord_equal(expand = FALSE) +
+  theme_pub(legend_position = "bottom") +
   theme(
-    legend.position = "bottom",
-    legend.title = element_text(size = 8),
-    legend.text = element_text(size = 7),
-    plot.caption = element_text(size = 6.5, colour = "grey30", hjust = 0),
-    plot.margin = margin(2, 2, 2, 2)
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.line = element_blank(),
+    panel.border = element_blank()
   )
 
 # Biome heatmap -------------------------------------------------------------------------
 
-heat_ranks[, text_colour := fifelse(mean_rank < mean(RANK_LIMITS) - 0.35, "white", "black")]
+# Text contrast follows the displayed fill: light text on the darker low-rank
+# end of the scale, dark text elsewhere. This is cosmetic only.
+heat_ranks[, text_colour := fifelse(
+  mean_rank < mean(RANK_LIMITS) - 0.35,
+  COL_WHITE,
+  COL_BLACK
+)]
+
+best_key <- "Best dataset in row"
 
 p_heat <- ggplot(heat_ranks, aes(x = dataset, y = biome)) +
-  geom_tile(aes(fill = mean_rank), colour = "white", linewidth = 0.6) +
+  geom_tile(
+    aes(fill = mean_rank),
+    colour = COL_WHITE,
+    linewidth = FIG_BOUNDARY_LINEWIDTH
+  ) +
   geom_tile(
     data = heat_best,
+    aes(colour = best_key),
     fill = NA,
-    colour = "black",
-    linewidth = 0.7
+    linewidth = FIG_LINEWIDTH_EMPH
   ) +
   geom_text(
-    aes(label = sprintf("%.2f", mean_rank), colour = text_colour),
-    size = 2.6
+    data = heat_ranks[text_colour == COL_WHITE],
+    aes(label = sprintf("%.2f", mean_rank)),
+    colour = COL_WHITE,
+    family = FIG_FONT,
+    size = FIG_GEOM_TEXT_SIZE
   ) +
-  scale_colour_identity() +
-  scale_fill_viridis_c(
+  geom_text(
+    data = heat_ranks[text_colour == COL_BLACK],
+    aes(label = sprintf("%.2f", mean_rank)),
+    colour = COL_BLACK,
+    family = FIG_FONT,
+    size = FIG_GEOM_TEXT_SIZE
+  ) +
+  scale_colour_manual(
+    name = NULL,
+    values = setNames(COL_BLACK, best_key)
+  ) +
+  scale_fill_seq(
     name = "Mean rank\n(1 = best)",
-    option = "mako",
+    palette = "seq_default",
     limits = RANK_LIMITS,
-    oob = scales::squish,
     breaks = seq(RANK_LIMITS[1], RANK_LIMITS[2], by = 0.5),
-    guide = guide_colourbar(
-      title.position = "top",
-      barwidth = unit(3.5, "cm"),
-      barheight = unit(0.3, "cm")
-    )
+    labels = label_minus
   ) +
   scale_x_discrete(position = "top") +
   facet_grid(block ~ ., scales = "free_y", space = "free_y") +
-  labs(x = NULL, y = NULL, caption = "Outline: best dataset in the row.") +
-  theme_minimal(base_size = 8) +
+  labs(x = NULL, y = NULL) +
+  theme_pub(legend_position = "bottom") +
   theme(
     panel.grid = element_blank(),
-    panel.spacing.y = unit(0.15, "cm"),
+    panel.spacing.y = grid::unit(FIG_PANEL_SPACING_MM, "mm"),
     strip.text = element_blank(),
-    axis.text.x = element_text(face = "bold", colour = "black"),
-    axis.text.y = element_text(colour = "black"),
-    legend.position = "bottom",
-    legend.title = element_text(size = 8),
-    legend.text = element_text(size = 7),
-    plot.caption = element_text(size = 6.5, colour = "grey30", hjust = 0),
-    plot.margin = margin(2, 2, 2, 2)
+    axis.title = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_text(face = "bold")
   )
 
-figure_3 <- (p_hex + p_heat) +
-  plot_layout(widths = c(2, 1)) +
-  plot_annotation(tag_levels = "a") &
-  theme(plot.tag = element_text(face = "bold", size = 11))
+figure_3 <- add_panel_tags(
+  (p_hex + p_heat) +
+    plot_layout(widths = c(1.8, 1))
+)
+
+# The heatmap is intentionally displayed on the 2-4 mean-rank range.
+check_limits(
+  heat_ranks$mean_rank,
+  RANK_LIMITS,
+  "Biome/all-land mean performance rank"
+)
 
 # Outputs ====================================================================
 
-save_figure(figure_3, "fig03_dataset_performance", width = 11, height = 5.6)
+figure_stem <- file.path(PATH_OUTPUT_FIGURES, "fig03_dataset_performance")
+save_figure(
+  figure_3,
+  file_stem = figure_stem,
+  width_mm = FIG_WIDTH_DOUBLE,
+  height_mm = FIGURE_HEIGHT_MM
+)
+check_fonts(paste0(figure_stem, ".pdf"))
+
+layout_sentence <- if (identical(hex_layout$source, "established")) {
+  "Hexagon positions follow the established IPCC reference-region cartogram. "
+} else {
+  paste0(
+    "The established IPCC hexagon file was unavailable at rendering; ",
+    "a centroid-based fallback cartogram was used. "
+  )
+}
+
+caption <- paste0(
+  "Dataset performance structure. ",
+  "(a) Best-performing candidate in each IPCC region, defined as the lowest ",
+  "area-weighted mean of six per-cell ranks (P and E climatological mean, ",
+  "interannual SD and Sen slope). The small dot identifies the runner-up when ",
+  "the difference from the winner is < ", CLOSE_CALL_TOLERANCE, " mean-rank units. ",
+  layout_sentence,
+  "(b) Area-weighted mean performance rank by biome and for all land; rank 1 is ",
+  "best and rank 5 worst. The outlined cell is the lowest mean rank in each row. ",
+  "The heatmap is displayed over ranks ", RANK_LIMITS[1], "-", RANK_LIMITS[2],
+  "; values outside this range are shown with the corresponding end colour."
+)
+writeLines(caption, paste0(figure_stem, "_caption.txt"))
 
 # Validation =================================================================
 
