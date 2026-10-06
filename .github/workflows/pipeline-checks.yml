@@ -3,11 +3,11 @@
 name: pipeline-checks
 
 on:
-  pull_request:
-    paths: ["code/**", "tools/**", "docs/pipeline_manifest.md"]
+#  pull_request:
+#    paths: ["code/**", "tools/**", "docs/pipeline_manifest.md"]
   push:
-    branches: [master]
-    paths: ["code/**", "tools/**", "docs/pipeline_manifest.md"]
+#    branches: [master]
+#    paths: ["code/**", "tools/**", "docs/pipeline_manifest.md"]
 
 permissions:
   contents: read
