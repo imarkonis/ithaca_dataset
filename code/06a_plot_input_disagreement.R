@@ -27,6 +27,7 @@
 
 source("code/_source.R")
 source("code/_figure_helpers.R")
+source("code/_figs.R") # current publication design system; restores modern export helpers
 
 # Inputs =====================================================================
 
@@ -58,6 +59,9 @@ grid_classes <- readRDS(
 # Relative spread (IQR / |median|) at which the colour scale saturates.
 SPREAD_CAP <- 1
 
+# Final ESSD/Copernicus figure height. Width comes from the active journal profile.
+FIGURE_HEIGHT_MM <- 160
+
 # Trend direction: products with a significant trend of EACH sign needed to call
 # a cell "significant disagreement" when no sign has a majority.
 MIN_OPPOSING <- 2L
@@ -73,7 +77,11 @@ DIRECTION_LABELS <- c(
   "Significant disagreement",
   "No robust trend signal"
 )
-DIRECTION_COLS <- c("#2166ac", "#b35806", "#762a83", "grey88")
+# Figure-specific categorical mapping using the shared ITHACA palette.
+DIRECTION_COLS <- setNames(
+  c(PAL_CAT_8[2], PAL_CAT_8[1], PAL_CAT_8[5], COL_MISSING),
+  DIRECTION_LEVELS
+)
 
 SIGNIFICANCE_LEVELS <- c("most_sig", "disagree", "most_nonsig")
 SIGNIFICANCE_LABELS <- c(
@@ -81,7 +89,10 @@ SIGNIFICANCE_LABELS <- c(
   "Products disagree",
   "Most products non-significant"
 )
-SIGNIFICANCE_COLS <- c("#01665e", "#dfc27d", "grey88")
+SIGNIFICANCE_COLS <- setNames(
+  c(PAL_CAT_8[2], PAL_CAT_8[6], COL_MISSING),
+  SIGNIFICANCE_LEVELS
+)
 
 # Functions ==================================================================
 
@@ -203,42 +214,72 @@ add_classes <- function(summary_dt) {
   summary_dt[]
 }
 
-# Colour scale shared by the two spread rows.
+# Colour scale shared by the two spread rows. Limits and the square-root
+# transform are scientific display choices; colours and legend geometry come
+# from the shared design system.
 spread_scale <- function(name) {
-  scale_fill_viridis_c(
+  scale_fill_seq(
     name = name,
-    option = "magma",
-    direction = -1,
+    palette = "seq_default",
     limits = c(0, SPREAD_CAP),
     transform = "sqrt",
     breaks = c(0.1, 0.25, 0.5, 1),
-    labels = function(x) ifelse(x >= SPREAD_CAP, "≥100%", scales::percent(x, accuracy = 1)),
-    oob = scales::squish,
-    na.value = COL_NO_DATA,
-    guide = guide_colourbar(barheight = unit(2.6, "cm"), barwidth = unit(0.3, "cm"))
+    labels = function(x) {
+      ifelse(x >= SPREAD_CAP, "\u2265100%", scales::percent(x, accuracy = 1))
+    },
+    na.value = COL_MISSING
   )
 }
 
 category_scale <- function(name, levels, labels, cols) {
-  scale_fill_manual(
+  scale_fill_cat(
     name = name,
-    values = setNames(cols, levels),
+    values = cols,
     labels = setNames(labels, levels),
     breaks = levels,
     limits = levels,
     drop = FALSE,
-    na.value = COL_NO_DATA,
-    guide = guide_legend(keywidth = unit(0.35, "cm"), keyheight = unit(0.35, "cm"))
+    na.value = COL_MISSING
   )
+}
+
+# Global raster map using the shared map frame and publication styling.
+publication_map <- function(dt, fill, fill_scale) {
+  ggplot(dt, aes(x = lon, y = lat, fill = .data[[fill]])) +
+    geom_raster() +
+    geom_path(
+      data = COASTLINES,
+      aes(x = long, y = lat, group = group),
+      inherit.aes = FALSE,
+      colour = COL_REFERENCE,
+      linewidth = FIG_BOUNDARY_LINEWIDTH
+    ) +
+    fill_scale +
+    scale_x_continuous(
+      breaks = scales::breaks_pretty(n = 4),
+      labels = label_lon,
+      expand = expansion(mult = 0)
+    ) +
+    scale_y_continuous(
+      breaks = scales::breaks_pretty(n = 4),
+      labels = label_lat,
+      expand = expansion(mult = 0)
+    ) +
+    coord_quickmap(xlim = MAP_XLIM, ylim = MAP_YLIM, expand = FALSE) +
+    theme_pub_map(legend_position = "right")
 }
 
 column_header <- function(label) {
   ggplot() +
-    annotate("text", x = 0, y = 0, label = label, size = 3.6, fontface = "bold") +
-    theme_void()
+    annotate(
+      "text", x = 0, y = 0, label = label,
+      family = FIG_FONT, size = FIG_GEOM_TEXT_SIZE,
+      colour = COL_TEXT, fontface = "bold"
+    ) +
+    theme_void(base_size = FIG_BASE_SIZE, base_family = FIG_FONT)
 }
 
-# One row of the figure: P map, E map, and the row's legend in the third column.
+# One row of the figure: P map, E map, and the row's shared legend.
 figure_row <- function(map_prec, map_evap) {
   (map_prec + map_evap + guide_area()) +
     plot_layout(widths = c(1, 1, 0.34), guides = "collect")
@@ -260,50 +301,92 @@ evap_map <- merge(mask, evap_summary, by = c("lon", "lat"), all.x = TRUE)
 
 # Maps -------------------------------------------------------------------------
 
-p_mean_prec <- cell_map(prec_map, "spread_mean", spread_scale("Spread\n(IQR / |median|)")) +
-  map_label("Mean spread")
-p_mean_evap <- cell_map(evap_map, "spread_mean", spread_scale("Spread\n(IQR / |median|)")) +
-  map_label("Mean spread")
+p_mean_prec <- publication_map(
+  prec_map, "spread_mean",
+  spread_scale("Long-term mean spread\n(IQR / |median|)")
+)
+p_mean_evap <- publication_map(
+  evap_map, "spread_mean",
+  spread_scale("Long-term mean spread\n(IQR / |median|)")
+)
 
-p_sd_prec <- cell_map(prec_map, "spread_sd", spread_scale("Spread\n(IQR / |median|)")) +
-  map_label("SD spread")
-p_sd_evap <- cell_map(evap_map, "spread_sd", spread_scale("Spread\n(IQR / |median|)")) +
-  map_label("SD spread")
+p_sd_prec <- publication_map(
+  prec_map, "spread_sd",
+  spread_scale("Interannual SD spread\n(IQR / |median|)")
+)
+p_sd_evap <- publication_map(
+  evap_map, "spread_sd",
+  spread_scale("Interannual SD spread\n(IQR / |median|)")
+)
 
 direction_scale <- category_scale(
-  "Trend direction\n(reference products)",
+  "Trend direction",
   DIRECTION_LEVELS, DIRECTION_LABELS, DIRECTION_COLS
 )
-p_dir_prec <- cell_map(prec_map, "direction", direction_scale) + map_label("Trend direction")
-p_dir_evap <- cell_map(evap_map, "direction", direction_scale) + map_label("Trend direction")
+p_dir_prec <- publication_map(prec_map, "direction", direction_scale)
+p_dir_evap <- publication_map(evap_map, "direction", direction_scale)
 
 significance_scale <- category_scale(
-  "Trend significance\n(reference products)",
+  "Trend significance",
   SIGNIFICANCE_LEVELS, SIGNIFICANCE_LABELS, SIGNIFICANCE_COLS
 )
-p_sig_prec <- cell_map(prec_map, "significance", significance_scale) + map_label("Trend significance")
-p_sig_evap <- cell_map(evap_map, "significance", significance_scale) + map_label("Trend significance")
+p_sig_prec <- publication_map(prec_map, "significance", significance_scale)
+p_sig_evap <- publication_map(evap_map, "significance", significance_scale)
 
-figure_2 <- (
-  (column_header("Precipitation (P)") | column_header("Evaporation (E)") | plot_spacer()) +
-    plot_layout(widths = c(1, 1, 0.34))
-) /
-  figure_row(p_mean_prec, p_mean_evap) /
+# The figure contains no panel subtitles or embedded caption. Panel tags and
+# column headers carry only the structure needed to read the multi-panel layout.
+map_grid <- figure_row(p_mean_prec, p_mean_evap) /
   figure_row(p_sd_prec, p_sd_evap) /
   figure_row(p_dir_prec, p_dir_evap) /
-  figure_row(p_sig_prec, p_sig_evap) +
-  plot_layout(heights = c(0.07, 1, 1, 1, 1)) +
-  plot_annotation(
-    caption = paste0(
-      "Spread: IQR / |median| across the 8 reference products (median over the five leave-one-out references). ",
-      "Trend: Mann-Kendall p < 0.1; direction after the majority logic of 01f."
-    ),
-    theme = theme(plot.caption = element_text(size = 6.5, colour = "grey30", hjust = 0))
-  )
+  figure_row(p_sig_prec, p_sig_evap)
+
+map_grid <- add_panel_tags(map_grid)
+
+figure_2 <- (
+  (column_header("Precipitation (P)") |
+     column_header("Evaporation (E)") |
+     plot_spacer()) +
+    plot_layout(widths = c(1, 1, 0.34))
+) /
+  map_grid +
+  plot_layout(heights = c(0.06, 1))
+
+# The spread scale is capped, so report any saturated values explicitly.
+check_limits(
+  c(prec_map$spread_mean, evap_map$spread_mean),
+  c(0, SPREAD_CAP),
+  "Long-term mean relative spread"
+)
+check_limits(
+  c(prec_map$spread_sd, evap_map$spread_sd),
+  c(0, SPREAD_CAP),
+  "Interannual SD relative spread"
+)
 
 # Outputs ====================================================================
 
-save_figure(figure_2, "fig02_input_disagreement", width = 11.5, height = 9.2)
+figure_stem <- file.path(PATH_OUTPUT_FIGURES, "fig02_input_disagreement")
+quiet_raster_gaps(
+  save_figure(
+    figure_2,
+    file_stem = figure_stem,
+    width_mm = FIG_WIDTH_DOUBLE,
+    height_mm = FIGURE_HEIGHT_MM
+  )
+)
+check_fonts(paste0(figure_stem, ".pdf"))
+
+caption <- paste0(
+  "Input disagreement among the precipitation and evaporation reference products. ",
+  "(a, b) Relative spread of the long-term mean and (c, d) relative spread of ",
+  "interannual standard deviation, expressed as IQR / |median| across the ",
+  "eight-member reference ensembles and summarized across the five leave-one-out ",
+  "references. The colour scale uses a square-root transform and is capped at 100%; ",
+  "larger values are shown with the maximum colour. (e, f) Trend-direction agreement ",
+  "and (g, h) trend-significance agreement. Trends use the Mann-Kendall test with ",
+  "p < 0.1 and the majority logic defined in 01f."
+)
+writeLines(caption, paste0(figure_stem, "_caption.txt"))
 
 # Validation =================================================================
 
