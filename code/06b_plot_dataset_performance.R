@@ -29,6 +29,11 @@ source("code/_source.R")
 source("code/_figure_helpers.R")
 source("code/_figs.R") # current publication design system; restores modern export helpers
 
+stopifnot(
+  setequal(names(PAL_DATASETS), CANDIDATES),
+  setequal(names(DATASET_LABELS), CANDIDATES)
+)
+
 # Inputs =====================================================================
 
 RANK_COLUMNS <- c(
@@ -340,7 +345,7 @@ ranked <- merge(
   by = c("lon", "lat")
 )
 
-# Regions: best candidate and how decisive it is ---------------------------------
+# Regions: best-performing candidate --------------------------------------------
 
 region_ranks <- mean_rank_by(ranked, "region")
 winners <- region_winners(copy(region_ranks))
