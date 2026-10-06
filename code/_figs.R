@@ -181,7 +181,9 @@ colset_mid <- c(
   "#F4CC70", "#EBB582", "#BF9A77", "#E38B75", "#CE5A57",
   "#CA3433", "#785A46"
 )
-PAL_MAIN <- colset_mid
+colset_mid_qual <- colset_mid[c(11, 2, 4, 6,  1, 8, 10, 5, 7, 3, 9, 12)]
+
+PAL_MAIN <- colset_mid_qual
 PAL_CAT_8 <- PAL_MAIN[1:8]
 PAL_CAT_6 <- PAL_MAIN[1:6]
 PAL_DATASETS <- setNames(PAL_MAIN[1:5], c("ERA5L", "FLDAS", "GLEAM", "MERRA", "TERRA"))
