@@ -93,6 +93,13 @@ Fixed neutral colours for text (`COL_TEXT`), axes (`COL_AXIS`), reference lines 
 
 ## 7. Categorical palette
 
+**ITHACA project override (6 October 2026):** the default `PAL_MAIN` is the
+`colset_mid` palette from `imarkonis/ithaca/source/graphics.R`. `PAL_DATASETS`
+uses its first five colours in the fixed candidate order, and `PAL_BIOMES`
+preserves that file's named biome colours with explicit aliases for the
+coarser pRecipe classes. `PAL_OKABE_ITO` remains available as an alternative.
+All project mappings live in `code/_figs.R`.
+
 Okabe–Ito colour-blind-aware palette for up to eight important categories (`PAL_CAT_8`), in this order: blue, orange, bluish green, vermillion, reddish purple, sky blue, yellow, dark neutral. Yellow is weak on white; avoid it for thin lines and small points.
 
 Rules:

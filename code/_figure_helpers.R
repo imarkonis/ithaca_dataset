@@ -10,6 +10,7 @@
 # Libraries ==================================================================
 
 library(patchwork)   # layout; cowplot is used for legend extraction (cowplot::get_legend)
+source("code/_figs.R") # shared palettes; legacy helpers below retain their API
 
 # Datasets ===================================================================
 
@@ -17,14 +18,8 @@ library(patchwork)   # layout; cowplot is used for legend extraction (cowplot::g
 CANDIDATES <- c("ERA5L", "FLDAS", "GLEAM", "MERRA", "TERRA")
 stopifnot(setequal(CANDIDATES, EVAP_NAMES_SHORT))
 
-# Fixed across all figures (docs/figures_plan.md, set in 07b).
-DATASET_COLS <- c(
-  ERA5L = "#1b9e77",
-  FLDAS = "#d95f02",
-  GLEAM = "#7570b3",
-  MERRA = "#e7298a",
-  TERRA = "#66a61e"
-)
+# One fixed mapping from the main colset_mid palette across manuscript figures.
+DATASET_COLS <- PAL_DATASETS
 
 # Weighting scenarios ========================================================
 
