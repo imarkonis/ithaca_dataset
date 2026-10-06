@@ -63,28 +63,9 @@ MIN_RANK_COMPONENTS <- 4L
 # Final ESSD/Copernicus figure height. Width comes from the active journal profile.
 FIGURE_HEIGHT_MM <- 105
 
-DATASET_LABELS <- c(
-  ERA5L = "ERA5L",
-  FLDAS = "FLDAS",
-  GLEAM = "GLEAM",
-  MERRA = "MERRA2",
-  TERRA = "TERRA"
-)
-DATASET_AXIS_LABELS <- c(
-  ERA5L = "ERA5L",
-  FLDAS = "FLDAS",
-  GLEAM = "GLEAM",
-  MERRA = "MERRA2",
-  TERRA = "TERRA"
-)
-
 # Use only cells in which all five candidates are ranked, so that every rank is
 # on the same 1-5 scale.
 REQUIRE_ALL_CANDIDATES <- TRUE
-
-# Difference in mean rank between first and second candidate below which a region
-# is called a close call (runner-up shown as a dot).
-CLOSE_CALL_TOLERANCE <- 0.05
 
 # Biomes ordered along the environmental gradient from cold to warm and from
 # azonal to open water; biomes missing from this list are appended.
@@ -138,7 +119,7 @@ mean_rank_by <- function(ranked, group_column) {
   ]
 }
 
-# Winner, runner-up and their difference per region.
+# Best-performing candidate per region.
 region_winners <- function(region_ranks) {
   setorder(region_ranks, region, mean_rank)
 
@@ -146,14 +127,9 @@ region_winners <- function(region_ranks) {
     ,
     .(
       winner = dataset[1],
-      runner_up = dataset[2],
-      rank_winner = mean_rank[1],
-      margin = mean_rank[2] - mean_rank[1]
+      rank_winner = mean_rank[1]
     ),
     by = region
-  ][
-    ,
-    close_call := margin < CLOSE_CALL_TOLERANCE
   ][]
 }
 
@@ -426,40 +402,22 @@ if (length(missing_hexagons) > 0) {
 
 hex_polygons <- merge(
   hexagons,
-  winners[, .(Acronym = region, winner, runner_up, margin, close_call)],
+  winners[, .(Acronym = region, winner)],
   by = "Acronym"
 )
 
 hex_polygons[, winner := factor(winner, levels = CANDIDATES)]
 
-hex_labels <- unique(hex_polygons[, .(Acronym, V1, V2, winner, runner_up, close_call)])
-hex_labels[, text_colour := label_colour(DATASET_COLS[as.character(winner)])]
-
-# Runner-up dot for close calls, placed in the lower right of the hexagon.
-hex_extent <- hex_polygons[
-  ,
-  .(width = diff(range(long)), height = diff(range(lat))),
-  by = Acronym
-]
-
-close_calls <- merge(hex_labels[close_call == TRUE], hex_extent, by = "Acronym")
-close_calls[, `:=`(
-  dot_x = V1 + 0.26 * width,
-  dot_y = V2 - 0.30 * height,
-  runner_up = factor(runner_up, levels = CANDIDATES)
-)]
+hex_labels <- unique(hex_polygons[, .(Acronym, V1, V2, winner)])
+hex_labels[, text_colour := label_colour(PAL_DATASETS[as.character(winner)])]
 
 dataset_fill <- scale_fill_cat(
   name = "Dataset",
   values = PAL_DATASETS,
+  breaks = CANDIDATES,
   limits = CANDIDATES,
-  labels = DATASET_LABELS,
+  labels = DATASET_LABELS[CANDIDATES],
   drop = FALSE
-)
-
-close_call_key <- sprintf(
-  "Runner-up when mean-rank difference < %.2f",
-  CLOSE_CALL_TOLERANCE
 )
 
 p_hex <- ggplot() +
@@ -477,22 +435,7 @@ p_hex <- ggplot() +
     fontface = "bold",
     show.legend = FALSE
   ) +
-  geom_point(
-    data = close_calls,
-    aes(x = dot_x, y = dot_y, fill = runner_up, shape = close_call_key),
-    colour = COL_WHITE,
-    stroke = FIG_POINT_STROKE,
-    size = FIG_POINT_SIZE * 1.5,
-    show.legend = c(fill = FALSE, shape = TRUE)
-  ) +
   scale_colour_identity() +
-  scale_shape_manual(
-    name = NULL,
-    values = setNames(21, close_call_key),
-    guide = guide_legend(
-      override.aes = list(fill = COL_CONTEXT, colour = COL_WHITE)
-    )
-  ) +
   dataset_fill +
   coord_equal(expand = FALSE) +
   theme_pub(legend_position = "bottom") +
@@ -548,7 +491,7 @@ p_heat <- ggplot(heat_ranks, aes(x = dataset, y = biome)) +
     breaks = seq(RANK_LIMITS[1], RANK_LIMITS[2], by = 0.5),
     labels = label_minus
   ) +
-  scale_x_discrete(position = "top", labels = DATASET_AXIS_LABELS) +
+  scale_x_discrete(position = "top", labels = DATASET_LABELS[CANDIDATES]) +
   facet_grid(block ~ ., scales = "free_y", space = "free_y") +
   labs(x = NULL, y = NULL) +
   theme_pub(legend_position = "bottom") +
@@ -598,8 +541,7 @@ caption <- paste0(
   "Dataset performance structure. ",
   "(a) Best-performing candidate in each IPCC region, defined as the lowest ",
   "area-weighted mean of six per-cell ranks (P and E climatological mean, ",
-  "interannual SD and Sen slope). The small dot identifies the runner-up when ",
-  "the difference from the winner is < ", CLOSE_CALL_TOLERANCE, " mean-rank units. ",
+  "interannual SD and Sen slope). ",
   layout_sentence,
   "(b) Area-weighted mean performance rank by biome and for all land; rank 1 is ",
   "best and rank 5 worst. The outlined cell is the lowest mean rank in each row. ",
@@ -619,10 +561,7 @@ cat(
 )
 
 cat("\nRegions won, by dataset (", nrow(winners), " regions):\n", sep = "")
-print(winners[, .(regions = .N, close_calls = sum(close_call)), by = winner][order(-regions)])
-
-cat("\nMargin between first and second (mean rank), quantiles:\n")
-print(round(quantile(winners$margin, c(0, 0.25, 0.5, 0.75, 1)), 3))
+print(winners[, .(regions = .N), by = winner][order(-regions)])
 
 cat("\nAll land, area-weighted mean rank:\n")
 print(all_land[order(mean_rank)][, mean_rank := round(mean_rank, 3)][])
