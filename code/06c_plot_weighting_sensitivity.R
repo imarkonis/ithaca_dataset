@@ -11,61 +11,76 @@
 # (b) effective number of datasets, N_eff = 1 / sum(w^2), in the same eight
 #     scenarios, on one common scale (a concentration / diversity measure, not a
 #     confidence measure);
-# (c) cross-scenario robustness: modal dominant dataset and the number of
-#     scenarios that agree on it;
-# (d) physics-gate coverage: how many of the five candidates are still available
+# (c) modal dominant dataset across scenarios, and (d) the number of scenarios
+#     that agree on it;
+# (e) physics-gate coverage: how many of the five candidates are still available
 #     in each unit before any weighting (the same for all scenarios).
-# A small matrix (area-weighted mean probability per dataset and mean N_eff per
-# scenario) is added as a global summary.
 #
 # Ties: a unit whose two highest probabilities differ by less than TIE_TOLERANCE
 # has no dominant dataset and is shown as a tie (this includes many neutral
-# units). Ties do not vote in (c). The neutral scenario never votes in (c)
-# either: it is the no-preference reference, so its dominant dataset only
-# reflects which candidates survive the gate, not a weighting choice. The vote
-# is therefore over the remaining seven scenarios.
+# units). Ties do not vote in (c, d). The neutral scenario never votes either:
+# it is the no-preference reference, so its dominant dataset only reflects which
+# candidates survive the gate, not a weighting choice. The vote is therefore
+# over the remaining seven scenarios.
+#
+# Input   : weights_region_biome.Rds (03f), grid_classes.Rds (01g)
+# Output  : fig04_weighting_sensitivity.pdf / .png / _caption.txt in
+#           PATH_OUTPUT_FIGURES
+# Note    : converted to the shared figure standard (docs/SCIENTIFIC_FIGURE_*.md,
+#           code/_figs.R) with AI assistance (Claude Code, 2026-10-06); to be
+#           checked by the authors
 # ============================================================================
 
 # Libraries ==================================================================
 
 source("code/_source.R")
 source("code/_figure_helpers.R")
+source("code/_figs.R") # current publication design system; restores modern export helpers
 
 # Inputs =====================================================================
 
-weights_region_biome <- readRDS(
+weights_region_biome <- as.data.table(readRDS(
   file.path(PATH_OUTPUT_OUTPUT, "weights_region_biome.Rds")
-)
+))
 
-grid_classes <- readRDS(
+grid_classes <- as.data.table(readRDS(
   file.path(PATH_OUTPUT_OUTPUT, "grid_classes.Rds")
+))
+
+stopifnot(
+  all(c("scenario", "region", "biome", "dataset", "w_region_biome") %in% names(weights_region_biome)),
+  all(c("lon", "lat", "region", "biome", "cell_weight") %in% names(grid_classes)),
+  !anyDuplicated(grid_classes[, .(lon, lat)]),
+  !anyDuplicated(weights_region_biome[, .(scenario, region, biome, dataset)]),
+  all(is.finite(weights_region_biome$w_region_biome) & weights_region_biome$w_region_biome >= 0),
+  all(SCENARIO_ORDER %in% weights_region_biome$scenario)
 )
 
-# Constants & Variables ======================================================
+# Scientific parameters ======================================================
 
 N_CANDIDATES <- length(CANDIDATES)
 
-# Two top probabilities closer than this are an exact tie.
+# Two top probabilities closer than this are an exact tie (probabilities are sums
+# of cell-area products, so only exact ties fall below it).
 TIE_TOLERANCE <- 1e-6
 
-# Scenarios that do not vote in the robustness count, and the scenario whose
-# positive probabilities define which candidates are available in a unit.
+# The neutral scenario has no weighting preference, so it does not vote in the
+# robustness count. Its positive probabilities define which candidates are
+# available in a unit (the physics gate), the same in every scenario.
 ROBUSTNESS_EXCLUDED <- "neutral"
 SUPPORT_SCENARIO <- "neutral"
 N_VOTERS <- length(setdiff(SCENARIO_ORDER, ROBUSTNESS_EXCLUDED))
 
+# N_eff is bounded by 1 (one dataset owns the unit) and the number of candidates
+# (equal weights); the full natural range is shown so scenarios read on one scale.
 NEFF_LIMITS <- c(1, N_CANDIDATES)
 
-# Used for exact ties in (a) and for units without a single modal dataset in (c).
-LEVEL_TIE     <- "Tie (no single dominant dataset)"
-LEVEL_NO_DATA <- "No candidate survives"
+LEVEL_TIE     <- "Tie"
+LEVEL_NO_DATA <- "No candidate"
+LEVEL_EMPTIED <- "Unit emptied by the gate"
 
-# Short scenario names for the summary matrix.
-SCENARIO_SHORT <- c(
-  base = "Base", clim_dominant = "Clim.", prec_dominant = "Prec.",
-  evap_dominant = "Evap.", rank_linear = "Rk lin.", rank_exp = "Rk exp.",
-  neutral = "Neutral", inverted = "Disagr."
-)
+# Final ESSD/Copernicus figure height. Width comes from the active journal profile.
+FIGURE_HEIGHT_MM <- 165
 
 # Functions ==================================================================
 
@@ -95,17 +110,11 @@ paint_units <- function(cells, unit_values) {
   merge(cells, unit_values, by = c("region", "biome"), all.x = TRUE)
 }
 
-map_legend_bottom <- function(plot) {
-  plot + theme(legend.position = "bottom")
-}
-
-heading <- function(label) {
-  ggplot() +
-    annotate("text", x = 0, y = 0, label = label, hjust = 0, size = 3.5, fontface = "bold") +
-    scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) +
-    scale_y_continuous(limits = c(-1, 1)) +
-    coord_cartesian(clip = "off") +
-    theme_void()
+# Small multiples: one frame, one scale, strips carry the panel names.
+facet_map <- function(dt, fill, fill_scale, ncol = 4, legend_position = "right") {
+  publication_map(dt, fill, fill_scale, legend_position, coord_labels = FALSE) +
+    facet_wrap(vars(panel), ncol = ncol) +
+    theme(strip.text = element_text(hjust = 0, size = FIG_STRIP_SIZE))
 }
 
 # Analysis ===================================================================
@@ -113,7 +122,6 @@ heading <- function(label) {
 weights <- weights_region_biome[scenario %in% SCENARIO_ORDER]
 weights[, dataset := as.character(dataset)]
 
-stopifnot(setequal(unique(weights$scenario), SCENARIO_ORDER))
 stopifnot(all(unique(weights$dataset) %in% CANDIDATES))
 
 units <- unit_summary(weights)
@@ -137,51 +145,71 @@ all_units <- unique(cells[, .(region, biome)])
 weighted_units <- unique(weights[, .(region, biome)])
 emptied_units <- fsetdiff(all_units, weighted_units)
 
-# (a) Dominant dataset per scenario ------------------------------------------------
+scenario_panel <- function(scenario_name) {
+  factor(
+    SCENARIO_LABELS[[scenario_name]],
+    levels = SCENARIO_LABELS[SCENARIO_ORDER]
+  )
+}
+
+# (a) Dominant dataset per scenario -------------------------------------------------
 
 dominant_levels <- c(CANDIDATES, LEVEL_TIE, LEVEL_NO_DATA)
 
-dominant_scale <- scale_fill_manual(
-  name = "Dominant dataset",
-  values = c(DATASET_COLS, setNames(c(COL_TIE, COL_NO_DATA), c(LEVEL_TIE, LEVEL_NO_DATA))),
-  limits = dominant_levels,
-  drop = FALSE,
-  guide = guide_legend(nrow = 1, keywidth = unit(0.4, "cm"), keyheight = unit(0.4, "cm"))
-)
-
-dominant_map <- function(scenario_name) {
+dominant_long <- rbindlist(lapply(SCENARIO_ORDER, function(scenario_name) {
   map_dt <- paint_units(
     cells,
     units[scenario == scenario_name, .(region, biome, dominant)]
   )
 
   map_dt[is.na(dominant), dominant := LEVEL_NO_DATA]
-  map_dt[, dominant := factor(dominant, levels = dominant_levels)]
+  map_dt[, `:=`(
+    dominant = factor(dominant, levels = dominant_levels),
+    panel = scenario_panel(scenario_name)
+  )]
+  map_dt[, .(lon, lat, dominant, panel)]
+}))
 
-  cell_map(map_dt, "dominant", dominant_scale, title = SCENARIO_LABELS[[scenario_name]])
-}
-
-# (b) Effective number of datasets per scenario -------------------------------------
-
-neff_scale <- scale_fill_viridis_c(
-  name = expression(N[eff]),
-  option = "mako",
-  limits = NEFF_LIMITS,
-  breaks = seq(NEFF_LIMITS[1], NEFF_LIMITS[2]),
-  na.value = COL_NO_DATA,
-  guide = guide_colourbar(barwidth = unit(5, "cm"), barheight = unit(0.3, "cm"))
+dominant_scale <- scale_fill_cat(
+  name = NULL,
+  values = c(
+    PAL_DATASETS,
+    setNames(c(COL_CONTEXT, COL_MISSING), c(LEVEL_TIE, LEVEL_NO_DATA))
+  ),
+  limits = dominant_levels,
+  labels = c(DATASET_LABELS, setNames(c(LEVEL_TIE, LEVEL_NO_DATA), c(LEVEL_TIE, LEVEL_NO_DATA))),
+  drop = FALSE,
+  guide = guide_legend(ncol = 1)
 )
 
-neff_map <- function(scenario_name) {
+p_dominant <- facet_map(dominant_long, "dominant", dominant_scale)
+
+# (b) Effective number of datasets per scenario ----------------------------------------
+
+neff_long <- rbindlist(lapply(SCENARIO_ORDER, function(scenario_name) {
   map_dt <- paint_units(
     cells,
     units[scenario == scenario_name, .(region, biome, n_effective)]
   )
 
-  cell_map(map_dt, "n_effective", neff_scale, title = SCENARIO_LABELS[[scenario_name]])
-}
+  map_dt[, panel := scenario_panel(scenario_name)]
+  map_dt[, .(lon, lat, n_effective, panel)]
+}))
 
-# (c) Cross-scenario robustness ---------------------------------------------------------
+# 1e-9 tolerance: N_eff reaches its natural bounds up to floating-point noise.
+check_limits(units$n_effective, NEFF_LIMITS + c(-1e-9, 1e-9), "Effective number of datasets (units)")
+
+neff_scale <- scale_fill_seq(
+  name = expression(N[eff]),
+  palette = "seq_default",
+  limits = NEFF_LIMITS,
+  breaks = seq(NEFF_LIMITS[1], NEFF_LIMITS[2]),
+  labels = label_minus
+)
+
+p_neff <- facet_map(neff_long, "n_effective", neff_scale)
+
+# (c, d) Cross-scenario robustness ---------------------------------------------------------
 
 votes <- units[!(scenario %in% ROBUSTNESS_EXCLUDED) & !tie, .N, by = .(region, biome, winner)]
 
@@ -196,10 +224,7 @@ robustness <- votes[
   by = .(region, biome)
 ]
 
-robustness[
-  ,
-  modal_label := fifelse(split, LEVEL_TIE, modal)
-]
+robustness[, modal_label := fifelse(split, LEVEL_TIE, modal)]
 
 # Units where no scenario has a dominant dataset.
 undecided <- fsetdiff(weighted_units, robustness[, .(region, biome)])
@@ -220,35 +245,35 @@ modal_dt[is.na(modal_label), modal_label := LEVEL_NO_DATA]
 modal_dt[, modal_label := factor(modal_label, levels = dominant_levels)]
 modal_dt[, n_agree_f := factor(n_agree, levels = seq_len(N_VOTERS))]
 modal_dt[n_agree == 0L, n_agree_f := NA]
+modal_dt[, panel := factor("Modal dataset")]
 
-# Same colours and legend as (a): the modal map needs no legend of its own.
-p_modal <- cell_map(modal_dt, "modal_label", dominant_scale, title = "c  Modal dataset") +
-  theme(legend.position = "none")
+# Same colours as (a), so the modal map needs no legend of its own.
+p_modal <- publication_map(modal_dt, "modal_label", dominant_scale, "none", coord_labels = FALSE) +
+  facet_wrap(vars(panel)) +
+  theme(strip.text = element_text(hjust = 0, size = FIG_STRIP_SIZE))
 
-agree_scale <- scale_fill_viridis_d(
-  name = paste0("Scenarios agreeing on the modal dataset (of ", N_VOTERS, ")"),
-  option = "rocket",
-  direction = -1,
-  begin = 0.05,
-  end = 0.85,
-  drop = FALSE,
+# Only the levels that occur are listed in the legends of (d) and (e); colours stay
+# tied to the value, so they match the full scale.
+agree_scale <- scale_fill_cat(
+  name = paste0("Scenarios agreeing (of ", N_VOTERS, ")"),
+  values = setNames(fig_colours("seq_default", N_VOTERS), seq_len(N_VOTERS)),
   na.translate = FALSE,
-  guide = guide_legend(
-    title.position = "top", nrow = 1,
-    keywidth = unit(0.4, "cm"), keyheight = unit(0.4, "cm")
-  )
+  guide = guide_legend(nrow = 2, byrow = TRUE)
 )
 
 # Units without a vote (none in practice) are left blank rather than drawn as NA.
-p_agree <- cell_map(modal_dt[!is.na(n_agree_f)], "n_agree_f", agree_scale, title = "c  Agreement on the modal dataset") +
-  theme(legend.position = "bottom", legend.title = element_text(size = 6.5))
+agree_dt <- modal_dt[!is.na(n_agree_f)][, panel := factor("Scenario agreement")]
+p_agree <- publication_map(agree_dt, "n_agree_f", agree_scale, "bottom", coord_labels = FALSE) +
+  facet_wrap(vars(panel)) +
+  theme(strip.text = element_text(hjust = 0, size = FIG_STRIP_SIZE))
 
-# (d) Physics-gate coverage ---------------------------------------------------------------
+# (e) Physics-gate coverage ---------------------------------------------------------------------
 
 gate <- units[scenario == SUPPORT_SCENARIO, .(region, biome, n_available)]
 
 gate_dt <- paint_units(cells, gate)
 gate_dt[, n_available_f := factor(n_available, levels = seq_len(N_CANDIDATES))]
+gate_dt[, panel := factor("Gate coverage")]
 
 # Cells of emptied units, marked with crosses (thinned if the units are large).
 emptied_cells <- merge(cells, emptied_units, by = c("region", "biome"))
@@ -259,132 +284,71 @@ if (nrow(emptied_cells) > 2000L) {
   ]
 }
 
-emptied_cells[, marker := "Unit emptied by the gate"]
+emptied_cells[, `:=`(marker = LEVEL_EMPTIED, panel = factor("Gate coverage"))]
 
-gate_scale <- scale_fill_viridis_d(
-  name = "Candidates surviving the gate (of 5)",
-  option = "cividis",
-  drop = FALSE,
+gate_scale <- scale_fill_cat(
+  name = paste0("Candidates surviving the gate (of ", N_CANDIDATES, ")"),
+  values = setNames(fig_colours("seq_default", N_CANDIDATES), seq_len(N_CANDIDATES)),
   na.translate = FALSE,
-  guide = guide_legend(
-    title.position = "top", nrow = 1, order = 1,
-    keywidth = unit(0.4, "cm"), keyheight = unit(0.4, "cm")
-  )
+  guide = guide_legend(nrow = 2, byrow = TRUE, order = 1)
 )
 
 # Emptied units have no value; they are left blank and marked with crosses.
-p_gate <- cell_map(gate_dt[!is.na(n_available_f)], "n_available_f", gate_scale, title = "d  Physics-gate coverage") +
-  theme(legend.position = "bottom", legend.title = element_text(size = 6.5)) +
+p_gate <- publication_map(
+  gate_dt[!is.na(n_available_f)], "n_available_f", gate_scale, "bottom", coord_labels = FALSE
+) +
+  facet_wrap(vars(panel)) +
   geom_point(
     data = emptied_cells,
     aes(x = lon, y = lat, shape = marker),
     inherit.aes = FALSE,
-    size = 1.1,
-    stroke = 0.5
+    size = FIG_POINT_SIZE,
+    stroke = FIG_POINT_STROKE,
+    colour = COL_TEXT
   ) +
   scale_shape_manual(
     name = NULL,
-    values = c("Unit emptied by the gate" = 4),
+    values = setNames(4, LEVEL_EMPTIED),
     guide = guide_legend(order = 2)
-  )
-
-# Global summary matrix -------------------------------------------------------------------
-
-areas <- unit_area(grid_classes)
-
-summary_input <- merge(weights, areas, by = c("region", "biome"))
-
-# Total area of the units that have weights (the same in every scenario).
-total_area <- areas[weighted_units, on = .(region, biome), sum(area)]
-
-dataset_share <- summary_input[
-  ,
-  .(share = sum(area * w_region_biome) / total_area),
-  by = .(scenario, dataset)
-]
-
-mean_neff <- merge(units, areas, by = c("region", "biome"))[
-  ,
-  .(mean_neff = weighted.mean(n_effective, area)),
-  by = scenario
-]
-
-summary_long <- rbindlist(list(
-  dataset_share[, .(scenario, column = dataset, value = share, label = sprintf("%.0f%%", 100 * share))],
-  mean_neff[, .(scenario, column = "Mean N_eff", value = NA_real_, label = sprintf("%.1f", mean_neff))]
-))
-
-summary_long[
-  ,
-  `:=`(
-    scenario = factor(scenario, levels = SCENARIO_ORDER),
-    column = factor(column, levels = rev(c(CANDIDATES, "Mean N_eff")))
-  )
-]
-
-# Scenarios along x so that the matrix is wide and short, like the maps next to it.
-p_summary <- ggplot(summary_long, aes(x = scenario, y = column)) +
-  geom_tile(aes(fill = value), colour = "white", linewidth = 0.5) +
-  geom_text(aes(label = label), size = 2.1) +
-  scale_fill_gradient(
-    low = "white", high = "grey35", limits = c(0, 0.5), oob = scales::squish,
-    na.value = "white", guide = "none"
   ) +
-  scale_x_discrete(labels = SCENARIO_SHORT) +
-  labs(x = NULL, y = NULL, title = "Global summary: mean probability (%) and N_eff") +
-  theme_minimal(base_size = 7) +
-  theme(
-    aspect.ratio = MAP_ASPECT,
-    panel.grid = element_blank(),
-    plot.title = element_text(size = 8, face = "bold", hjust = 0),
-    axis.text.x = element_text(angle = 40, hjust = 1, colour = "black"),
-    axis.text.y = element_text(colour = "black"),
-    plot.margin = margin(2, 2, 2, 2)
-  )
+  theme(strip.text = element_text(hjust = 0, size = FIG_STRIP_SIZE))
 
-# Assembly ----------------------------------------------------------------------------------
+# Assembly ---------------------------------------------------------------------------------------
 
-# Eight maps in two rows of four (share scenarios, then rank foils, neutral and
-# inverted) and one shared legend underneath.
-scenario_block <- function(map_function) {
-  maps <- lapply(
-    SCENARIO_ORDER,
-    function(scenario_name) map_function(scenario_name) + theme(legend.position = "none")
-  )
-
-  wrap_plots(
-    c(maps, list(legend_element(map_function(SCENARIO_ORDER[1])))),
-    design = "ABCD\nEFGH\nIIII",
-    heights = c(1, 1, 0.16)
-  )
-}
-
-block_a <- scenario_block(dominant_map)
-block_b <- scenario_block(neff_map)
-
-block_c <- wrap_plots(p_modal, p_agree, p_gate, p_summary, nrow = 1)
-
-figure_4 <- (
-  heading("a  Dominant dataset (highest sampling probability) in each weighting scenario") /
-    block_a /
-    heading("b  Effective number of datasets, N_eff: concentration of the probability, not confidence") /
-    block_b /
-    block_c
-) +
-  plot_layout(heights = c(0.14, 2.3, 0.14, 2.3, 1.45)) +
-  plot_annotation(
-    caption = paste0(
-      "N_eff = 1 / sum(w^2) over the candidates of a region x biome unit. ",
-      "Tie: the two highest probabilities are equal. ",
-      "Neutral (no weighting preference) and ties do not vote in c. ",
-      "Units without any surviving candidate are grey."
-    ),
-    theme = theme(plot.caption = element_text(size = 6.5, colour = "grey30", hjust = 0))
-  )
+figure_4 <- add_panel_tags(
+  p_dominant / p_neff / (p_modal | p_agree | p_gate) +
+    plot_layout(heights = c(2.2, 2.2, 1.5))
+)
 
 # Outputs ====================================================================
 
-save_figure(figure_4, "fig04_weighting_sensitivity", width = 12.5, height = 11)
+figure_stem <- file.path(PATH_OUTPUT_FIGURES, "fig04_weighting_sensitivity")
+quiet_raster_gaps(
+  save_figure(
+    figure_4,
+    file_stem = figure_stem,
+    width_mm = FIG_WIDTH_DOUBLE,
+    height_mm = FIGURE_HEIGHT_MM
+  )
+)
+check_fonts(paste0(figure_stem, ".pdf"))
+
+caption <- paste0(
+  "Sensitivity of the dataset probabilities to the weighting scenario. ",
+  "All maps show region × biome sampling units on the 0.25° land grid ",
+  "(180° W–180° E, 58° S–84° N). ",
+  "(a) Dominant dataset, the one with the highest sampling probability, in each of the ",
+  "eight weighting scenarios; units whose two highest probabilities are equal are shown as a tie. ",
+  "(b) Effective number of datasets, N_eff = 1 / Σ w², on one common scale from 1 (one dataset ",
+  "owns the unit) to ", N_CANDIDATES, " (equal weights); N_eff measures how concentrated the ",
+  "probability is, not confidence. (c) Modal dominant dataset across the ", N_VOTERS,
+  " scenarios other than neutral (neutral has no weighting preference; ties do not vote), ",
+  "with the same colours as (a). (d) Number of those scenarios that select the modal dataset. ",
+  "(e) Number of the five candidates still available in each unit after the physical-consistency gate, ",
+  "which is the same in all scenarios; crosses mark units emptied by the gate. ",
+  "Data: weights_region_biome.Rds, 1982–2021."
+)
+writeLines(caption, paste0(figure_stem, "_caption.txt"))
 
 # Validation =================================================================
 
@@ -419,6 +383,20 @@ cat("Units split between datasets: ", robustness[split == TRUE, .N], "\n", sep =
 
 cat("\nCandidates surviving the gate per unit:\n")
 print(gate[, .(units = .N), by = n_available][order(n_available)])
+
+# Global summary (area-weighted mean probability per dataset and scenario; mean
+# N_eff), not drawn in the figure: it belongs in the Supplement.
+areas <- unit_area(grid_classes)
+total_area <- areas[weighted_units, on = .(region, biome), sum(area)]
+
+cat("\nArea-weighted mean probability (%) by scenario and dataset:\n")
+print(dcast(
+  merge(weights, areas, by = c("region", "biome"))[
+    , .(share = round(100 * sum(area * w_region_biome) / total_area, 1)),
+    by = .(scenario, dataset)
+  ],
+  scenario ~ dataset, value.var = "share"
+)[match(SCENARIO_ORDER, scenario)])
 
 cat("\nArea share of emptied units: ",
     round(100 * areas[emptied_units, on = .(region, biome), sum(area, na.rm = TRUE)] / areas[, sum(area)], 3),
