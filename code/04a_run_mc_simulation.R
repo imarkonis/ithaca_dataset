@@ -139,18 +139,43 @@ make_weight_cdf <- function(weights_dt) {
   ]
   
   
-  # Validate probabilities ----------------------------------------------------
-  
-  if (
-    any(
-      !is.finite(weights_region$w_region_biome) |
-      weights_region$w_region_biome < 0
-    )
-  ) {
-    
-    stop(
-      "Region-biome weights contain non-finite or negative values."
-    )
+  # Valid dataset rows need finite probabilities. An NA dataset / NA weight
+  # row represents a region-biome with no physically eligible candidate.
+
+  bad_weight_rows <- weights_region[
+    (is.na(dataset) & !is.na(w_region_biome)) |
+      (!is.na(dataset) & (
+        !is.finite(w_region_biome) |
+          w_region_biome < 0
+      ))
+  ]
+
+  if (nrow(bad_weight_rows)) {
+    print(bad_weight_rows)
+    stop("Invalid region-biome probability or missing-dataset record.")
+  }
+
+  missing_groups <- weights_region[
+    is.na(dataset),
+    .(n_missing = .N),
+    by = .(scenario, region, biome)
+  ]
+
+  if (any(missing_groups$n_missing != 1L)) {
+    stop("Missing-dataset units must have exactly one NA record per scenario.")
+  }
+
+  mixed_groups <- weights_region[
+    ,
+    .(
+      n_missing = sum(is.na(dataset)),
+      n_valid = sum(!is.na(dataset))
+    ),
+    by = .(scenario, region, biome)
+  ][n_missing > 0L & n_valid > 0L]
+
+  if (nrow(mixed_groups)) {
+    stop("Missing-dataset markers cannot coexist with valid dataset weights.")
   }
   
   
@@ -186,7 +211,7 @@ make_weight_cdf <- function(weights_dt) {
   # than silently modifying the intended probabilities.
   
   weight_check <- weights_region[
-    ,
+    !is.na(dataset),
     .(
       w_sum = sum(w_region_biome)
     ),
@@ -256,7 +281,7 @@ make_weight_cdf <- function(weights_dt) {
   
   dataset_levels <- sort(
     unique(
-      weights_region$dataset
+      weights_region[!is.na(dataset), dataset]
     )
   )
   
@@ -280,23 +305,14 @@ make_weight_cdf <- function(weights_dt) {
   # Construct cumulative probability intervals -------------------------------
   
   weight_cdf <- weights_region[
-    ,
+    !is.na(dataset),
     {
-      
-      p_high <- cumsum(
-        w_region_biome
-      )
-      
-      # Force the final interval boundary to exactly one to remove numerical
-      # floating-point drift.
-      
+
+      p_high <- cumsum(w_region_biome)
       p_high[.N] <- 1
-      
-      p_low <- c(
-        0,
-        p_high[-.N]
-      )
-      
+
+      p_low <- c(0, p_high[-.N])
+
       .(
         dataset = dataset,
         w_region_biome = w_region_biome,
@@ -304,18 +320,35 @@ make_weight_cdf <- function(weights_dt) {
         p_high = p_high
       )
     },
-    by = .(
+    by = .(scenario, region, biome)
+  ]
+
+  # Keep NA-only units in the CDF table as explicit missing-selection markers.
+  # They must never be mistaken for probability intervals.
+
+  missing_cdf <- weights_region[
+    is.na(dataset),
+    .(
       scenario,
       region,
-      biome
+      biome,
+      dataset = NA_character_,
+      w_region_biome = NA_real_,
+      p_low = NA_real_,
+      p_high = NA_real_
     )
   ]
+
+  weight_cdf <- rbindlist(
+    list(weight_cdf, missing_cdf),
+    use.names = TRUE
+  )
   
   
   # Validate CDF boundaries ---------------------------------------------------
   
   cdf_check <- weight_cdf[
-    ,
+    !is.na(dataset),
     .(
       first_low = first(p_low),
       last_high = last(p_high)
@@ -438,8 +471,8 @@ make_mc_selection <- function(
     ),
     allow.cartesian = TRUE
   ][
-    u >= p_low &
-      u < p_high,
+    is.na(dataset) |
+      (u >= p_low & u < p_high),
     .(
       sim,
       scenario,
@@ -848,9 +881,9 @@ stopifnot(
 
 # Check selected datasets.
 stopifnot(
-  all(
-    change_sensitivity$dataset ==
-      change_first_1000$dataset
+  identical(
+    change_sensitivity$dataset,
+    change_first_1000$dataset
   )
 )
 
