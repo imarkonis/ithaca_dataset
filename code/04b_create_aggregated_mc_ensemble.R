@@ -51,6 +51,7 @@ prepare_region_biome_area <- function(grid_classes) {
     grid_dt[
       !is.na(region) &
         !is.na(biome) &
+        as.character(biome) != "Water" &
         is.finite(cell_area_weight) &
         cell_area_weight > 0,
       .(
@@ -116,16 +117,30 @@ make_mc_region_biome_year <- function(
     )
   ]
   
-  dt[
-    sel,
-    on = .(
-      dataset,
+  # Expand all selections, including dataset = NA, to every analysis year.
+  # An inner join would silently discard units with no eligible dataset.
+
+  selection_year <- sel[
+    ,
+    .(year = sort(unique(dt$year))),
+    by = .(
+      sim,
+      scenario,
       region,
-      biome
-    ),
-    allow.cartesian = TRUE,
-    nomatch = 0L
-  ][
+      biome,
+      dataset
+    )
+  ]
+
+  out <- merge(
+    selection_year,
+    dt,
+    by = c("dataset", "region", "biome", "year"),
+    all.x = TRUE,
+    sort = FALSE
+  )
+
+  out[
     ,
     .(
       sim,
@@ -218,6 +233,28 @@ region_biome_area <- prepare_region_biome_area(
 mc_region_biome_year <- make_mc_region_biome_year(
   dataset_region_biome_year,
   mc_selection
+)
+
+# NA-only region-biome selections remain present for every analysis year.
+
+missing_selections <- unique(
+  mc_selection[
+    is.na(dataset),
+    .(sim, scenario, region, biome)
+  ]
+)
+
+missing_annual <- unique(
+  mc_region_biome_year[
+    is.na(dataset) &
+      is.na(prec) &
+      is.na(evap),
+    .(sim, scenario, region, biome)
+  ]
+)
+
+stopifnot(
+  nrow(missing_selections) == nrow(missing_annual)
 )
 
 mc_region_year <- make_mc_region_year(
