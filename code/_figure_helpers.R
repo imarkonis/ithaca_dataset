@@ -29,10 +29,9 @@ DATASET_LABELS <- c(
 
 # Weighting scenarios ========================================================
 
-# The eight scenarios of the sensitivity analysis (labelled in 07b), ordered by
-# kind: the four share scenarios, the two rank foils, neutral, inverted.
-# `change` and `trend_dominant` are also written by 03e/04a but are not part of
-# the eight.
+# 03e writes ten weighting scenarios. SCENARIO_ORDER is the older set of eight
+# (labelled in 07b), ordered by kind: the four share scenarios, the two rank
+# foils, neutral, inverted. It is kept as it is because 06d uses it.
 SCENARIO_ORDER <- c(
   "base", "clim_dominant", "prec_dominant", "evap_dominant",
   "rank_linear", "rank_exp",
@@ -40,15 +39,26 @@ SCENARIO_ORDER <- c(
   "inverted"
 )
 
+# The eight scenarios compared in the main figures: the ten of 03e without
+# neutral (no weighting preference) and inverted (labelled "Disagreement", an
+# adversarial stress test).
+SCENARIO_ORDER_MAIN <- c(
+  "base", "change", "clim_dominant", "trend_dominant",
+  "prec_dominant", "evap_dominant",
+  "rank_linear", "rank_exp"
+)
+
 SCENARIO_LABELS <- c(
-  base          = "Base",
-  clim_dominant = "Climate dominated",
-  prec_dominant = "Precipitation dominated",
-  evap_dominant = "Evaporation dominated",
-  rank_linear   = "Rank linear",
-  rank_exp      = "Rank exponential",
-  neutral       = "Neutral",
-  inverted      = "Disagreement"
+  base           = "Base",
+  change         = "Change dominated",
+  clim_dominant  = "Climate dominated",
+  trend_dominant = "Trend dominated",
+  prec_dominant  = "Precipitation dominated",
+  evap_dominant  = "Evaporation dominated",
+  rank_linear    = "Rank linear",
+  rank_exp       = "Rank exponential",
+  neutral        = "Neutral",
+  inverted       = "Disagreement"
 )
 
 # Map frame ==================================================================
@@ -160,6 +170,15 @@ map_label <- function(label, size = 2.8) {
     label = label, hjust = 0, vjust = 0,
     size = size, fontface = "bold"
   )
+}
+
+# White text on dark fills, black text on light fills.
+label_colour <- function(fill) {
+  luminance <- colSums(
+    col2rgb(fill) * c(0.299, 0.587, 0.114)
+  ) / 255
+
+  ifelse(luminance < 0.55, COL_WHITE, COL_BLACK)
 }
 
 weighted_mean_safe <- function(value, weight) {
