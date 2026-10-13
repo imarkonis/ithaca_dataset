@@ -26,6 +26,12 @@
 # pass the same checks. A file that exists but differs from the snapshot stops
 # the script, unless ARCHIVE_REPLACED_FILES is TRUE: it is then moved to an
 # "archive" folder inside its raw folder and the snapshot copy is downloaded.
+#
+# Zenodo is often slow and sometimes drops a connection, so downloads use the
+# curl command line tool (included in Windows 10/11, macOS and Linux). A
+# download that is interrupted continues from its .part file, in the same run or
+# in the next one. There is no time limit on a whole download; a connection that
+# moves less than 1 kB/s for STALL_SECONDS is dropped and then resumed.
 # ============================================================================
 
 # Libraries ==================================================================
@@ -49,9 +55,11 @@ ITHACA_RECORD_ID <- "23193962"
 ARCHIVE_REPLACED_FILES <- FALSE
 ARCHIVE_FOLDER <- "archive"
 
-# The largest files are 460-600 MB, so allow up to an hour per file.
-options(timeout = max(3600, getOption("timeout")))
-
+# A file is tried up to DOWNLOAD_ATTEMPTS times, each attempt continuing the
+# partial file where the last one stopped. R's own timeout option is not used: it
+# limits the total time of a transfer, which a slow connection easily exceeds.
+DOWNLOAD_ATTEMPTS <- 20
+STALL_SECONDS <- 300
 # Functions ==================================================================
 
 # Files of a Zenodo record with name, size, md5 checksum and download link.
@@ -169,9 +177,79 @@ archive_mismatched_files <- function(manifest) {
   invisible(archived)
 }
 
-# A file is downloaded under a temporary name and renamed once it has the
-# expected size, so an interrupted download is never mistaken for a finished one.
+# Download one file to part_path with the curl command line tool, which resumes a
+# partial file (-C -) and drops a stalled connection (less than 1 kB/s for
+# STALL_SECONDS). A failed attempt is repeated and continues the partial file.
+# A file that was resumed is checked against its md5 at once, so a bad start is
+# not carried on to the end; in that case it is downloaded again from the start.
+download_file_resumable <- function(url, part_path, expected_size, expected_md5,
+                                    attempts = DOWNLOAD_ATTEMPTS) {
+  for (attempt in seq_len(attempts)) {
+    start <- if (file.exists(part_path)) file.size(part_path) else 0
+
+    # More bytes than the file has: this cannot be the beginning of it.
+    if (start > expected_size) {
+      file.remove(part_path)
+      start <- 0
+    }
+
+    if (start < expected_size) {
+      if (start > 0) {
+        message(
+          "Resuming at ", round(start / 1e6), " of ", round(expected_size / 1e6), " MB"
+        )
+      }
+
+      tryCatch(
+        download.file(
+          url = url,
+          destfile = part_path,
+          mode = "wb",
+          method = "curl",
+          quiet = FALSE,
+          extra = c("-C", "-", "--speed-limit", "1000", "--speed-time", STALL_SECONDS)
+        ),
+        error = function(e) message("Download interrupted: ", conditionMessage(e))
+      )
+    }
+
+    size <- if (file.exists(part_path)) file.size(part_path) else 0
+
+    if (size == expected_size) {
+      if (start == 0 || unname(tools::md5sum(part_path)) == expected_md5) {
+        return(invisible(TRUE))
+      }
+
+      message("The resumed file does not match its md5 checksum; downloading it again.")
+      file.remove(part_path)
+    }
+
+    if (attempt < attempts) {
+      message("Trying again in 10 s (attempt ", attempt + 1, " of ", attempts, ")")
+      Sys.sleep(10)
+    }
+  }
+
+  stop(
+    "Could not finish ", basename(part_path), " after ", attempts, " attempts. ",
+    "The partial file is kept; run the script again to continue.",
+    call. = FALSE
+  )
+}
+
+# A file is downloaded under a temporary name and renamed once it is complete,
+# so an interrupted download is never mistaken for a finished one.
 download_manifest_files <- function(manifest) {
+  needs_download <- !file.exists(file.path(manifest$output_dir, manifest$file_name))
+
+  if (any(needs_download) && !nzchar(Sys.which("curl"))) {
+    stop(
+      "The curl command line tool is needed to download the files, but it was ",
+      "not found. It is included in Windows 10/11, macOS and Linux.",
+      call. = FALSE
+    )
+  }
+
   for (i in seq_len(nrow(manifest))) {
     out_path <- file.path(manifest$output_dir[i], manifest$file_name[i])
 
@@ -183,24 +261,18 @@ download_manifest_files <- function(manifest) {
     message("Downloading: ", manifest$file_name[i])
     part_path <- paste0(out_path, ".part")
 
-    download.file(
+    download_file_resumable(
       url = manifest$download_url[i],
-      destfile = part_path,
-      mode = "wb",
-      quiet = FALSE
+      part_path = part_path,
+      expected_size = manifest$expected_size[i],
+      expected_md5 = manifest$expected_md5[i]
     )
-
-    if (file.size(part_path) != manifest$expected_size[i]) {
-      file.remove(part_path)
-      stop("Incomplete download: ", manifest$file_name[i], call. = FALSE)
-    }
 
     file.rename(part_path, out_path)
   }
 
   invisible(manifest)
 }
-
 # Analysis ===================================================================
 
 record_files <- get_zenodo_files(ITHACA_RECORD_ID)
