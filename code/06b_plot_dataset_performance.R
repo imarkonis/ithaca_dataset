@@ -90,11 +90,10 @@ RANK_COLOUR_BETTER <- "#8FC4D8"
 RANK_COLOUR_NEUTRAL <- "#F6F3EE"
 RANK_COLOUR_WORSE <- "#E99A86"
 
-# Established IPCC hexagon layout.
-HEX_LAYOUT_FILES <- c(
-  "docs/figures/ipcc_ref_hexagons.csv",
-  "/mnt/shared/data/geodata/ipcc_v4/gloabl_ipcc_ref_hexagons.csv"
-)
+# Established IPCC hexagon layout, committed with the repository: one hexagon per
+# IPCC reference region (corners long/lat, centre V1/V2). The fixed shifts in
+# shift_ipcc_hexagons() are applied when the file is read.
+HEX_LAYOUT_FILE <- "docs/figures/ipcc_ref_hexagons.csv"
 
 
 # Functions ==================================================================
@@ -208,162 +207,19 @@ read_established_hexagons <- function(path) {
 }
 
 
-# Generated fallback layout ---------------------------------------------------
-
-# Area-weighted region centroid.
-# Longitude is treated as a circular variable.
-region_centroids <- function(grid_classes) {
-  grid_classes[
-    !is.na(region),
-    {
-      angle <- lon * pi / 180
-      
-      .(
-        lon_c = atan2(
-          sum(cell_weight * sin(angle)),
-          sum(cell_weight * cos(angle))
-        ) * 180 / pi,
-        lat_c = weighted.mean(lat, cell_weight)
-      )
-    },
-    by = .(Acronym = region)
-  ]
-}
-
-
-# Assign every region to a unique hexagonal grid cell.
-assign_regions_to_cells <- function(target_x, target_y, cell_x, cell_y) {
-  cost <- outer(target_x, cell_x, "-")^2 +
-    outer(target_y, cell_y, "-")^2
-  
-  n_regions <- length(target_x)
-  assigned <- rep(NA_integer_, n_regions)
-  free <- rep(TRUE, length(cell_x))
-  todo <- seq_len(n_regions)
-  
-  while (length(todo) > 0) {
-    sub_cost <- cost[todo, free, drop = FALSE]
-    pick <- which(sub_cost == min(sub_cost), arr.ind = TRUE)[1, ]
-    
-    region_i <- todo[pick[1]]
-    cell_j <- which(free)[pick[2]]
-    
-    assigned[region_i] <- cell_j
-    free[cell_j] <- FALSE
-    todo <- setdiff(todo, region_i)
-  }
-  
-  repeat {
-    improved <- FALSE
-    
-    for (i in seq_len(n_regions)) {
-      free_cells <- which(free)
-      
-      if (length(free_cells) > 0) {
-        best <- free_cells[which.min(cost[i, free_cells])]
-        
-        if (cost[i, best] < cost[i, assigned[i]] - 1e-12) {
-          free[assigned[i]] <- TRUE
-          assigned[i] <- best
-          free[best] <- FALSE
-          improved <- TRUE
-        }
-      }
-      
-      for (k in setdiff(seq_len(n_regions), i)) {
-        swapped <- cost[i, assigned[k]] + cost[k, assigned[i]]
-        current <- cost[i, assigned[i]] + cost[k, assigned[k]]
-        
-        if (swapped < current - 1e-12) {
-          held <- assigned[i]
-          assigned[i] <- assigned[k]
-          assigned[k] <- held
-          improved <- TRUE
-        }
-      }
-    }
-    
-    if (!improved) break
-  }
-  
-  assigned
-}
-
-
-generate_hexagons <- function(grid_classes) {
-  centroids <- region_centroids(grid_classes)
-  n_regions <- nrow(centroids)
-  
-  n_row <- ceiling(sqrt(1.7 * n_regions / 2.4))
-  n_col <- ceiling(1.7 * n_regions / n_row)
-  
-  cells <- CJ(
-    col = 0:(n_col - 1),
-    row = 0:(n_row - 1)
-  )
-  
-  cells[, `:=`(
-    x = sqrt(3) * (col + 0.5 * (row %% 2)),
-    y = 1.5 * (n_row - 1 - row)
-  )]
-  
-  centroids[, `:=`(
-    target_x = scales::rescale(lon_c, to = range(cells$x)),
-    target_y = scales::rescale(lat_c, to = range(cells$y))
-  )]
-  
-  centroids[
-    ,
-    cell := assign_regions_to_cells(
-      target_x, target_y, cells$x, cells$y
+# Read the committed layout; stop if it is missing, because a different layout
+# would give a different figure.
+load_hexagons <- function(path) {
+  if (!file.exists(path)) {
+    stop(
+      "Hexagon layout file not found: ", path, ". ",
+      "It is part of the repository (see issue #76).",
+      call. = FALSE
     )
-  ]
-  
-  corner_angle <- (30 + 60 * (0:5)) * pi / 180
-  
-  centroids[
-    ,
-    {
-      cx <- cells$x[cell]
-      cy <- cells$y[cell]
-      
-      .(
-        group = Acronym,
-        long = cx + 0.97 * cos(corner_angle),
-        lat = cy + 0.97 * sin(corner_angle),
-        V1 = cx,
-        V2 = cy
-      )
-    },
-    by = Acronym
-  ]
-}
-
-
-load_hexagons <- function(files, grid_classes) {
-  found <- files[file.exists(files)]
-  
-  if (length(found) > 0) {
-    message("Hexagon layout: ", found[1])
-    
-    return(list(
-      data = read_established_hexagons(found[1]),
-      source = "established",
-      path = found[1]
-    ))
   }
-  
-  warning(
-    "Hexagon layout file not found (", paste(files, collapse = ", "), "): ",
-    "using a generated layout, NOT the established IPCC hexagons.",
-    call. = FALSE
-  )
-  
-  list(
-    data = generate_hexagons(grid_classes),
-    source = "generated",
-    path = NA_character_
-  )
+
+  message("Hexagon layout: ", path)
+  read_established_hexagons(path)
 }
 
 
@@ -461,12 +317,7 @@ stopifnot(
 
 # Panel (a): IPCC hexagons ====================================================
 
-hex_layout <- load_hexagons(
-  HEX_LAYOUT_FILES,
-  grid_classes
-)
-
-hexagons <- hex_layout$data
+hexagons <- load_hexagons(HEX_LAYOUT_FILE)
 
 missing_hexagons <- setdiff(
   winners$region,
@@ -681,17 +532,10 @@ check_fonts(
 
 # Caption =====================================================================
 
-layout_sentence <- if (identical(hex_layout$source, "established")) {
-  paste0(
-    "Hexagon positions follow the established ",
-    "IPCC reference-region cartogram. "
-  )
-} else {
-  paste0(
-    "The established IPCC hexagon file was unavailable at rendering; ",
-    "a centroid-based fallback cartogram was used. "
-  )
-}
+layout_sentence <- paste0(
+  "Hexagon positions follow the established ",
+  "IPCC reference-region cartogram. "
+)
 
 caption <- paste0(
   "Dataset performance structure. ",
