@@ -121,9 +121,11 @@ mc_selection[
 
 # Dataset lookup ==============================================================
 
+# Missing regional selections remain NA: they must not become a source ID.
+
 datasets <- sort(
   unique(
-    mc_selection$dataset
+    mc_selection[!is.na(dataset), dataset]
   )
 )
 
