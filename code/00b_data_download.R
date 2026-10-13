@@ -4,22 +4,28 @@
 #
 # The analysis uses one frozen input snapshot: version v3 of the ITHACA dataset
 # record on Zenodo, https://doi.org/10.5281/zenodo.23193962. This script
-# downloads exactly the 35 NetCDF files named below from that record and checks
-# every file against the size and md5 checksum that Zenodo lists for it:
+# downloads every NetCDF file of that record (35 in v3) and checks each one
+# against the size and md5 checksum that Zenodo lists for it. The record, not
+# this script, defines which files are the inputs: a new snapshot only needs a
+# new ITHACA_RECORD_ID. The folder of a file follows from its name:
 #
-#   9 yearly land precipitation files (incl. GPCC) -> PATH_OUTPUT_RAW_PREC
-#   8 yearly land evaporation files                -> PATH_OUTPUT_RAW_EVAP
-#  18 monthly PET forcing files                    -> PATH_OUTPUT_RAW_OTHER
+#   *_monthly.nc       PET forcing               -> PATH_OUTPUT_RAW_OTHER
+#   *_e_*_yearly.nc    yearly land evaporation   -> PATH_OUTPUT_RAW_EVAP
+#   *_tp_*_yearly.nc   yearly land precipitation -> PATH_OUTPUT_RAW_PREC
+#
+# A NetCDF file that fits none of these names, or a folder left without any
+# file, stops the script. Files that are not NetCDF are not downloaded: the
+# record also holds the derived PET table merra2_mswx_pet_mm_1980_2024_yearly.fst,
+# but PET is derived locally from the forcing files by
+# 01c_prepare_pet_forcing.R and 01d_estimate_pet.R.
 #
 # The pinned record is the reproducibility source for the paper. The pRecipe,
 # evapoRe and tempeR records, and the MERRA-2, MSWX-Past and ERA5-Land products
 # the files were made from, are provenance sources, not runtime dependencies of
-# this script. PET itself is not downloaded: 01c_prepare_pet_forcing.R and
-# 01d_estimate_pet.R derive it from the forcing files. Files that already exist
-# are not downloaded again, but they must pass the same checks. A file that
-# exists but differs from the snapshot stops the script, unless
-# ARCHIVE_REPLACED_FILES is TRUE: it is then moved to an rchive folder inside
-# its raw folder and the snapshot copy is downloaded.
+# this script. Files that already exist are not downloaded again, but they must
+# pass the same checks. A file that exists but differs from the snapshot stops
+# the script, unless ARCHIVE_REPLACED_FILES is TRUE: it is then moved to an
+# "archive" folder inside its raw folder and the snapshot copy is downloaded.
 # ============================================================================
 
 # Libraries ==================================================================
@@ -36,54 +42,6 @@ library(jsonlite)
 ITHACA_RECORD_ID <- "23193962"
 
 # Constants & Variables ======================================================
-
-# The exact files of the snapshot that the workflow reads. Names are not
-# matched by pattern: this list is the input contract. The precipitation and
-# evaporation names are the ones 01a and 01b expect, and the forcing names must
-# match MERRA2_FILES and MSWX_FILES in 01c_prepare_pet_forcing.R.
-PREC_FILES <- c(
-  "cpc-global_tp_mm_land_197901_202309_025_yearly.nc",
-  "em-earth_tp_mm_land_195001_201912_025_yearly.nc",
-  "era5-land_tp_mm_land_195001_202112_025_yearly.nc",
-  "fldas_tp_mm_land_198201_202410_025_yearly.nc",
-  "gpcc-v2022_tp_mm_land_198101_202012_025_yearly.nc",
-  "merra-2_tp_mm_land_198001_202410_025_yearly.nc",
-  "mswep-v2-8_tp_mm_land_197901_202411_025_yearly.nc",
-  "precl_tp_mm_land_194801_202410_025_yearly.nc",
-  "terraclimate_tp_mm_land_195801_202312_025_yearly.nc"
-)
-
-EVAP_FILES <- c(
-  "bess_e_mm_land_198201_201912_025_yearly.nc",
-  "era5-land_e_mm_land_195001_202112_025_yearly.nc",
-  "etmonitor_e_mm_land_200006_201912_025_yearly.nc",
-  "etsynthesis_e_mm_land_200001_201912_025_yearly.nc",
-  "fldas_e_mm_land_198201_202212_025_yearly.nc",
-  "gleam-v4-1a_e_mm_land_198001_202312_025_yearly.nc",
-  "merra2_e_mm_land_198001_202301_025_yearly.nc",
-  "terraclimate_e_mm_land_195801_202112_025_yearly.nc"
-)
-
-PET_FORCING_FILES <- c(
-  "era5-land_albedo_198001_202501_025_monthly.nc",
-  "merra2_2sh_kgkg-1_land_198001_202511_025_monthly.nc",
-  "merra2_sp_Pa_land_198001_202511_025_monthly.nc",
-  "merra2_ssrd_wm-2_land_198001_202511_025_monthly.nc",
-  "merra2_strd_wm-2_land_198001_202511_025_monthly.nc",
-  "merra2_t2m_degC_land_198001_202511_025_monthly.nc",
-  "merra2_tmax_degC_land_198001_202512_025_monthly.nc",
-  "merra2_tmin_degC_land_198001_202512_025_monthly.nc",
-  "merra2_u2m_ms-1_land_198001_202511_025_monthly.nc",
-  "merra2_v2m_ms-1_land_198001_202511_025_monthly.nc",
-  "mswx-past_r_pct_land_197901_202512_025_monthly.nc",
-  "mswx-past_sp_pa_land_197901_202412_025_monthly.nc",
-  "mswx-past_ssrd_Wm-2_land_197902_202512_025_monthly.nc",
-  "mswx-past_strd_Wm-2_land_197902_202512_025_monthly.nc",
-  "mswx-past_t2m_degC_land_197901_202512_025_monthly.nc",
-  "mswx-past_tmax_degC_land_197901_202512_025_monthly.nc",
-  "mswx-past_tmin_degC_land_197901_202512_025_monthly.nc",
-  "mswx-past_u10_ms-1_land_197901_202412_025_monthly.nc"
-)
 
 # Existing files that differ from the snapshot (wrong size or md5): FALSE stops
 # the script and lists them, TRUE moves them to ARCHIVE_FOLDER (a subfolder of
@@ -118,25 +76,52 @@ get_zenodo_files <- function(record_id, attempts = 3) {
   stop("Could not read Zenodo record ", record_id, ".", call. = FALSE)
 }
 
-# One row per expected file, taken from the record. A name that is not in the
-# record is an error: the record defines the input contract.
-build_download_manifest <- function(file_names, output_dir, record_files) {
-  index <- match(file_names, record_files$key)
+# Raw folder of a NetCDF file, decided by its name; NA if the name fits no kind.
+raw_folder_for <- function(file_names) {
+  folder <- rep(NA_character_, length(file_names))
 
-  if (anyNA(index)) {
+  folder[grepl("_tp_.*_yearly\\.nc$", file_names)] <- PATH_OUTPUT_RAW_PREC
+  folder[grepl("_e_.*_yearly\\.nc$", file_names)] <- PATH_OUTPUT_RAW_EVAP
+  folder[grepl("_monthly\\.nc$", file_names)] <- PATH_OUTPUT_RAW_OTHER
+
+  folder
+}
+
+# One row per NetCDF file of the record, with the size, md5 and link Zenodo
+# lists for it. A name that fits no raw folder, or a raw folder that would stay
+# empty, is an error: the downstream scripts could not work with that record.
+build_download_manifest <- function(record_files) {
+  record_files <- record_files[grepl("\\.nc$", record_files$key), ]
+  output_dir <- raw_folder_for(record_files$key)
+
+  if (anyNA(output_dir)) {
     stop(
-      "Zenodo record ", ITHACA_RECORD_ID, " is missing expected files:\n",
-      paste(file_names[is.na(index)], collapse = "\n"),
+      "Zenodo record ", ITHACA_RECORD_ID, " has NetCDF files that fit no raw folder ",
+      "(expected *_tp_*_yearly.nc, *_e_*_yearly.nc or *_monthly.nc):\n",
+      paste(record_files$key[is.na(output_dir)], collapse = "\n"),
+      call. = FALSE
+    )
+  }
+
+  empty_folders <- setdiff(
+    c(PATH_OUTPUT_RAW_PREC, PATH_OUTPUT_RAW_EVAP, PATH_OUTPUT_RAW_OTHER),
+    output_dir
+  )
+
+  if (length(empty_folders) > 0) {
+    stop(
+      "Zenodo record ", ITHACA_RECORD_ID, " has no files for:\n",
+      paste(empty_folders, collapse = "\n"),
       call. = FALSE
     )
   }
 
   data.frame(
-    file_name = file_names,
-    download_url = record_files$links$self[index],
+    file_name = record_files$key,
+    download_url = record_files$links$self,
     output_dir = output_dir,
-    expected_size = record_files$size[index],
-    expected_md5 = sub("^md5:", "", record_files$checksum[index]),
+    expected_size = record_files$size,
+    expected_md5 = sub("^md5:", "", record_files$checksum),
     stringsAsFactors = FALSE
   )
 }
@@ -220,13 +205,13 @@ download_manifest_files <- function(manifest) {
 
 record_files <- get_zenodo_files(ITHACA_RECORD_ID)
 
-download_manifest <- rbind(
-  build_download_manifest(PREC_FILES, PATH_OUTPUT_RAW_PREC, record_files),
-  build_download_manifest(EVAP_FILES, PATH_OUTPUT_RAW_EVAP, record_files),
-  build_download_manifest(PET_FORCING_FILES, PATH_OUTPUT_RAW_OTHER, record_files)
-)
+not_netcdf <- record_files$key[!grepl("\\.nc$", record_files$key)]
 
-stopifnot(!anyDuplicated(download_manifest$file_name))
+if (length(not_netcdf) > 0) {
+  message("Not downloaded (not a NetCDF file): ", paste(not_netcdf, collapse = ", "))
+}
+
+download_manifest <- build_download_manifest(record_files)
 
 archived_files <- character(0)
 
@@ -238,9 +223,9 @@ download_manifest_files(download_manifest)
 
 # Outputs ====================================================================
 
-# The 35 NetCDF files are in place: precipitation in PATH_OUTPUT_RAW_PREC,
-# evaporation in PATH_OUTPUT_RAW_EVAP and PET forcing in PATH_OUTPUT_RAW_OTHER.
-# The complete list is held in download_manifest.
+# Every NetCDF file of the record is in place: precipitation in
+# PATH_OUTPUT_RAW_PREC, evaporation in PATH_OUTPUT_RAW_EVAP and PET forcing in
+# PATH_OUTPUT_RAW_OTHER. The complete list is held in download_manifest.
 
 # Validation =================================================================
 
@@ -309,9 +294,9 @@ if (length(unexpected_files) > 0) {
 message(
   "Validated ", nrow(download_manifest), " files from Zenodo record ",
   ITHACA_RECORD_ID, " (size and md5): ",
-  length(PREC_FILES), " precipitation, ",
-  length(EVAP_FILES), " evaporation and ",
-  length(PET_FORCING_FILES), " PET forcing",
+  sum(download_manifest$output_dir == PATH_OUTPUT_RAW_PREC), " precipitation, ",
+  sum(download_manifest$output_dir == PATH_OUTPUT_RAW_EVAP), " evaporation and ",
+  sum(download_manifest$output_dir == PATH_OUTPUT_RAW_OTHER), " PET forcing",
   if (length(archived_files) > 0) {
     paste0("; archived ", length(archived_files), " replaced file(s) in ", ARCHIVE_FOLDER)
   },
