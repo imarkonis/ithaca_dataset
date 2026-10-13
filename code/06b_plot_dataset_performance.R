@@ -566,7 +566,7 @@ p_hex <- ggplot() +
 
 # Panel (b): rank circle matrix ===============================================
 
-best_key <- "Best dataset in row"
+best_key <- "Most representative \ndataset in row"
 
 rank_distance_max <- max(
   abs(RANK_LIMITS - RANK_MIDPOINT)
@@ -646,7 +646,7 @@ p_heat <- ggplot(
 # Assemble ====================================================================
 
 figure_3 <- add_panel_tags(
-  (p_hex + p_heat) +
+  (p_hex / p_heat) +
     plot_layout(widths = c(1.8, 1))
 )
 
@@ -695,7 +695,7 @@ layout_sentence <- if (identical(hex_layout$source, "established")) {
 
 caption <- paste0(
   "Dataset performance structure. ",
-  "(a) Best-performing candidate in each IPCC region, defined as the ",
+  "(a) Most representative candidate in each IPCC region, defined as the ",
   "lowest area-weighted mean of six per-cell ranks: precipitation and ",
   "evaporation climatological mean, interannual SD and Sen slope. ",
   layout_sentence,
