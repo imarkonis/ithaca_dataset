@@ -2,10 +2,10 @@
 # Figure 2: input disagreement. Where do the observational products disagree?
 #
 # 4 x 2 maps (columns: precipitation, evaporation; rows: long-term mean spread,
-# interannual SD spread, trend-direction agreement, trend-significance
-# agreement) of the disagreement among the members of the two 8-member
-# reference ensembles. This is before candidate ranking, gating, weighting or
-# Monte Carlo sampling, and no dataset identities are shown.
+# interannual SD spread, number of products with a significant trend,
+# trend-direction agreement) of the disagreement among the members of the two
+# 8-member reference ensembles. This is before candidate ranking, gating,
+# weighting or Monte Carlo sampling, and no dataset identities are shown.
 #
 # Nothing is re-estimated. Everything comes from the reference tables of 01f
 # (prec_reference_values.fst, evap_reference_values.fst):
@@ -18,9 +18,11 @@
 #     counts of its leave-one-out reference (n_significant, n_pos, n_neg).
 #     The sums agree across all member candidates (checked in Validation).
 #
-# Trend direction keeps the majority logic of 01f (significant = Mann-Kendall
-# p < 0.1; majority significant = more than half of the members; majority
-# agrees = the larger sign group is more than half of the significant members).
+# Trend significance is the number of members whose trend is significant
+# (Mann-Kendall p < 0.1), 0 to 8, drawn on the same gradient as the spreads.
+# Trend direction keeps the majority logic of 01f (majority significant = more
+# than half of the members; majority agrees = the larger sign group is more than
+# half of the significant members).
 # ============================================================================
 
 # Libraries ==================================================================
@@ -70,36 +72,25 @@ SPREAD_CAP <- 1
 # Final ESSD/Copernicus figure height. Width comes from the active journal profile.
 FIGURE_HEIGHT_MM <- 160
 
+# Members of each reference ensemble: the upper limit of the significance count
+# (checked against the data in Validation).
+N_REFERENCE <- 8L
+
 # Trend direction: products with a significant trend of EACH sign needed to call
 # a cell "significant disagreement" when no sign has a majority.
 MIN_OPPOSING <- 2L
 
-# Trend significance: share of members with a significant trend.
-SIG_SHARE_HIGH <- 0.75   # at or above: most products significant
-SIG_SHARE_LOW  <- 0.25   # at or below: most products non-significant
-
 DIRECTION_LEVELS <- c("positive", "negative", "disagreement", "none")
 DIRECTION_LABELS <- c(
-  "Agreement: positive trend",
-  "Agreement: negative trend",
-  "Significant disagreement",
-  "No robust trend signal"
+  "Agreement:\npositive trend",
+  "Agreement:\nnegative trend",
+  "Significant\ndisagreement",
+  "No robust\ntrend signal"
 )
 # Figure-specific categorical mapping using the shared ITHACA palette.
 DIRECTION_COLS <- setNames(
   c(PAL_CAT_8[2], PAL_CAT_8[1], PAL_CAT_8[5], COL_MISSING),
   DIRECTION_LEVELS
-)
-
-SIGNIFICANCE_LEVELS <- c("most_sig", "disagree", "most_nonsig")
-SIGNIFICANCE_LABELS <- c(
-  "Most products significant",
-  "Products disagree",
-  "Most products non-significant"
-)
-SIGNIFICANCE_COLS <- setNames(
-  c(PAL_CAT_8[2], PAL_CAT_8[6], COL_MISSING),
-  SIGNIFICANCE_LEVELS
 )
 
 # Functions ==================================================================
@@ -194,28 +185,12 @@ classify_direction <- function(n_sig, n_pos, n_neg, n_ref) {
   )
 }
 
-classify_significance <- function(n_sig, n_ref) {
-  share <- n_sig / n_ref
-
-  fcase(
-    share >= SIG_SHARE_HIGH, "most_sig",
-    share <= SIG_SHARE_LOW, "most_nonsig",
-    default = "disagree"
-  )
-}
-
 add_classes <- function(summary_dt) {
   summary_dt[
     ,
-    `:=`(
-      direction = factor(
-        classify_direction(n_sig, n_pos, n_neg, n_ref),
-        levels = DIRECTION_LEVELS
-      ),
-      significance = factor(
-        classify_significance(n_sig, n_ref),
-        levels = SIGNIFICANCE_LEVELS
-      )
+    direction := factor(
+      classify_direction(n_sig, n_pos, n_neg, n_ref),
+      levels = DIRECTION_LEVELS
     )
   ]
 
@@ -239,6 +214,18 @@ spread_scale <- function(name) {
   )
 }
 
+# Number of members with a significant trend: the same gradient as the spreads,
+# linear from 0 to the ensemble size (these are counts, so no transform).
+significance_scale <- function(name) {
+  scale_fill_seq(
+    name = name,
+    palette = "seq_default",
+    limits = c(0, N_REFERENCE),
+    breaks = seq(0, N_REFERENCE, by = 2),
+    na.value = COL_MISSING
+  )
+}
+
 category_scale <- function(name, levels, labels, cols) {
   scale_fill_cat(
     name = name,
@@ -247,7 +234,9 @@ category_scale <- function(name, levels, labels, cols) {
     breaks = levels,
     limits = levels,
     drop = FALSE,
-    na.value = COL_MISSING
+    na.value = COL_MISSING,
+    # Two-line labels need a little space between the entries.
+    guide = guide_legend(theme = theme(legend.key.spacing.y = unit(FIG_PANEL_SPACING_MM / 2, "mm")))
   )
 }
 
@@ -256,7 +245,7 @@ publication_map <- function(dt, fill, fill_scale) {
   ggplot(dt, aes(x = lon, y = lat, fill = .data[[fill]])) +
     geom_raster() +
     geom_path(
-      data = COASTLINES,
+      data = COASTLINES_PUB, # simplified: eight maps with full-resolution lines exceed 5 MB
       aes(x = long, y = lat, group = group),
       inherit.aes = FALSE,
       colour = COL_REFERENCE,
@@ -309,8 +298,11 @@ evap_map <- merge(mask, evap_summary, by = c("lon", "lat"), all.x = TRUE)
 
 # Validation =================================================================
 
-# Both ensembles have the full 8 members, and the mask is the same everywhere.
-stopifnot(prec_summary[, all(n_ref == 8L)], evap_summary[, all(n_ref == 8L)])
+# Both ensembles have the full set of members, and the mask is the same everywhere.
+stopifnot(
+  prec_summary[, all(n_ref == N_REFERENCE)],
+  evap_summary[, all(n_ref == N_REFERENCE)]
+)
 stopifnot(nrow(prec_map) == nrow(mask), nrow(evap_map) == nrow(mask))
 stopifnot(!anyNA(prec_map$n_ref), !anyNA(evap_map$n_ref))
 
@@ -338,6 +330,15 @@ p_sd_evap <- publication_map(
   spread_scale("Interannual SD spread")
 )
 
+p_sig_prec <- publication_map(
+  prec_map, "n_sig",
+  significance_scale("Significant\ntrends (n)")
+)
+p_sig_evap <- publication_map(
+  evap_map, "n_sig",
+  significance_scale("Significant\ntrends (n)")
+)
+
 direction_scale <- category_scale(
   "Trend direction",
   DIRECTION_LEVELS, DIRECTION_LABELS, DIRECTION_COLS
@@ -345,21 +346,12 @@ direction_scale <- category_scale(
 p_dir_prec <- publication_map(prec_map, "direction", direction_scale)
 p_dir_evap <- publication_map(evap_map, "direction", direction_scale)
 
-significance_scale <- category_scale(
-  "Trend significance",
-  SIGNIFICANCE_LEVELS, SIGNIFICANCE_LABELS, SIGNIFICANCE_COLS
-)
-p_sig_prec <- publication_map(prec_map, "significance", significance_scale)
-p_sig_evap <- publication_map(evap_map, "significance", significance_scale)
-
 # The figure contains no panel subtitles or embedded caption. Panel tags and
 # column headers carry only the structure needed to read the multi-panel layout.
 map_grid <- figure_row(p_mean_prec, p_mean_evap) /
   figure_row(p_sd_prec, p_sd_evap) /
-  figure_row(p_dir_prec, p_dir_evap) /
-  figure_row(p_sig_prec, p_sig_evap)
-
-map_grid <- add_panel_tags(map_grid)
+  figure_row(p_sig_prec, p_sig_evap) /
+  figure_row(p_dir_prec, p_dir_evap)
 
 figure_2 <- (
   (column_header("Precipitation (P)") |
@@ -369,6 +361,17 @@ figure_2 <- (
 ) /
   map_grid +
   plot_layout(heights = c(0.06, 1))
+
+# Panel tags are set on the outermost layout (tags set on a nested layout are
+# lost): one tag per map, in the profile format; the two column headers get none.
+panel_tags <- c(
+  "", "",
+  paste0(FIG_SPEC$tag_prefix, letters[1:8], FIG_SPEC$tag_suffix)
+)
+
+figure_2 <- figure_2 +
+  plot_annotation(tag_levels = list(panel_tags)) &
+  theme(plot.tag = element_text(family = FIG_FONT, size = FIG_TAG_SIZE, face = "bold", colour = COL_TEXT))
 
 # The spread scale is capped, so report any saturated values explicitly.
 check_limits(
@@ -380,6 +383,11 @@ check_limits(
   c(prec_map$spread_sd, evap_map$spread_sd),
   c(0, SPREAD_CAP),
   "Interannual SD relative spread"
+)
+check_limits(
+  c(prec_map$n_sig, evap_map$n_sig),
+  c(0, N_REFERENCE),
+  "Number of significant trends"
 )
 
 # Outputs ====================================================================
@@ -401,9 +409,10 @@ caption <- paste0(
   "interannual standard deviation, expressed as IQR / |median| across the ",
   "eight-member reference ensembles and summarized across the five leave-one-out ",
   "references. The colour scale uses a square-root transform and is capped at 100%; ",
-  "larger values are shown with the maximum colour. (e, f) Trend-direction agreement ",
-  "and (g, h) trend-significance agreement. Trends use the Mann-Kendall test with ",
-  "p < 0.1 and the majority logic defined in 01f."
+  "larger values are shown with the maximum colour. (e, f) Number of the ",
+  N_REFERENCE, " reference products with a significant trend (Mann-Kendall test, ",
+  "p < 0.1), on the same colour gradient. (g, h) Trend-direction agreement, ",
+  "following the majority logic defined in 01f."
 )
 writeLines(caption, paste0(figure_stem, "_caption.txt"))
 
@@ -424,8 +433,8 @@ for (variable_name in c("prec", "evap")) {
   cat("\n", variable_name, ": trend direction, % of land area\n", sep = "")
   print(class_share(map_dt, "direction"))
 
-  cat("\n", variable_name, ": trend significance, % of land area\n", sep = "")
-  print(class_share(map_dt, "significance"))
+  cat("\n", variable_name, ": number of significant trends, % of land area\n", sep = "")
+  print(class_share(map_dt, "n_sig"))
 
   cat(
     "\n", variable_name, ": median relative spread, mean / SD = ",
