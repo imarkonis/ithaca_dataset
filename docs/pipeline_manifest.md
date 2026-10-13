@@ -175,7 +175,7 @@ Orange border: overwrites its input in place. Red: missing input.
 
 - Rerun after changing: not tracked (outputs are downloads or have names built at run time)
 - packages: jsonlite, tools
-- Constants: ITHACA_RECORD_ID = "23193962", PREC_FILES, EVAP_FILES, PET_FORCING_FILES
+- Constants: ITHACA_RECORD_ID = "23193962", PREC_FILES, EVAP_FILES, PET_FORCING_FILES, ARCHIVE_REPLACED_FILES = FALSE, ARCHIVE_FOLDER = "archive"
 
 ### 01a_crop_data.R
 

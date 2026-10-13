@@ -33,7 +33,7 @@ Defines the project folders under `PATH_SAVE`, creates them, and saves the path 
 
 ### <a name="s00b"></a>00b_data_download.R
 
-Downloads the 35 raw NetCDF files of the workflow from one pinned Zenodo record, the frozen ITHACA input snapshot (version `v3`, [10.5281/zenodo.23193962](https://doi.org/10.5281/zenodo.23193962)): 9 yearly land precipitation files (including GPCC), 8 yearly land evaporation files and 18 monthly PET forcing files. Every file is named explicitly and checked against the size and md5 checksum Zenodo lists for it. PET itself is not downloaded: [01c](#s01c) and [01d](#s01d) derive it from the forcing.
+Downloads the 35 raw NetCDF files of the workflow from one pinned Zenodo record, the frozen ITHACA input snapshot (version `v3`, [10.5281/zenodo.23193962](https://doi.org/10.5281/zenodo.23193962)): 9 yearly land precipitation files (including GPCC), 8 yearly land evaporation files and 18 monthly PET forcing files. Every file is named explicitly and checked against the size and md5 checksum Zenodo lists for it. PET itself is not downloaded: [01c](#s01c) and [01d](#s01d) derive it from the forcing. A file that already exists but differs from the snapshot stops the script; with `ARCHIVE_REPLACED_FILES <- TRUE` it is instead moved to an `archive` folder inside its raw folder and the snapshot copy is downloaded.
 
 **Inputs**
 - Zenodo record `23193962`, the frozen ITHACA input snapshot (web, not files from a script). The pRecipe, evapoRe and tempeR records the files originate from are not read.
@@ -43,6 +43,7 @@ Downloads the 35 raw NetCDF files of the workflow from one pinned Zenodo record,
 - <a name="f_raw_prec_nc"></a>`*.nc` in `PATH_OUTPUT_RAW_PREC`: the 9 raw yearly land precipitation NetCDFs of `PREC_FILES`, named `<dataset>_tp_mm_land_<start>_<end>_025_yearly.nc` (cpc-global, em-earth, era5-land, fldas, gpcc-v2022, merra-2, mswep-v2-8, precl, terraclimate). NetCDF, so no columns; the variable and dimension names inside are those of the Zenodo files and are not defined in this repo (check).
 - <a name="f_raw_evap_nc"></a>`*.nc` in `PATH_OUTPUT_RAW_EVAP`: the 8 raw yearly land evaporation NetCDFs of `EVAP_FILES`, named `<dataset>_e_mm_land_<start>_<end>_025_yearly.nc` (bess, era5-land, etmonitor, etsynthesis, fldas, gleam-v4-1a, merra2, terraclimate). Same remark on the contents (check).
 - <a name="f_raw_forcing_nc"></a>`*.nc` in `PATH_OUTPUT_RAW_OTHER`: the 18 monthly 0.25° PET forcing NetCDFs of `PET_FORCING_FILES`: 9 MERRA-2, 8 MSWX-Past and the ERA5-Land albedo. Same remark on the contents (check).
+- `archive/` inside each of the three raw folders, only when `ARCHIVE_REPLACED_FILES` is TRUE: the existing files that differed from the snapshot, under their own name (with a timestamp added if that name is already in the archive). `01a` does not read these folders.
 
 ### <a name="s01a"></a>01a_crop_data.R
 

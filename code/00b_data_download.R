@@ -16,7 +16,10 @@
 # the files were made from, are provenance sources, not runtime dependencies of
 # this script. PET itself is not downloaded: 01c_prepare_pet_forcing.R and
 # 01d_estimate_pet.R derive it from the forcing files. Files that already exist
-# are not downloaded again, but they must pass the same checks.
+# are not downloaded again, but they must pass the same checks. A file that
+# exists but differs from the snapshot stops the script, unless
+# ARCHIVE_REPLACED_FILES is TRUE: it is then moved to an rchive folder inside
+# its raw folder and the snapshot copy is downloaded.
 # ============================================================================
 
 # Libraries ==================================================================
@@ -82,6 +85,12 @@ PET_FORCING_FILES <- c(
   "mswx-past_u10_ms-1_land_197901_202412_025_monthly.nc"
 )
 
+# Existing files that differ from the snapshot (wrong size or md5): FALSE stops
+# the script and lists them, TRUE moves them to ARCHIVE_FOLDER (a subfolder of
+# their raw folder, which 01a does not read) and downloads the snapshot copy.
+ARCHIVE_REPLACED_FILES <- FALSE
+ARCHIVE_FOLDER <- "archive"
+
 # The largest files are 460-600 MB, so allow up to an hour per file.
 options(timeout = max(3600, getOption("timeout")))
 
@@ -132,6 +141,49 @@ build_download_manifest <- function(file_names, output_dir, record_files) {
   )
 }
 
+# Move every existing file that differs from the snapshot into ARCHIVE_FOLDER,
+# next to where it was. The file keeps its name; if that name is already taken in
+# the archive, a timestamp is added. Returns the new paths of the archived files.
+archive_mismatched_files <- function(manifest) {
+  archived <- character(0)
+
+  for (i in seq_len(nrow(manifest))) {
+    path <- file.path(manifest$output_dir[i], manifest$file_name[i])
+
+    if (!file.exists(path)) {
+      next
+    }
+
+    is_valid <- file.size(path) == manifest$expected_size[i] &&
+      unname(tools::md5sum(path)) == manifest$expected_md5[i]
+
+    if (is_valid) {
+      next
+    }
+
+    archive_dir <- file.path(manifest$output_dir[i], ARCHIVE_FOLDER)
+    dir.create(archive_dir, showWarnings = FALSE)
+    target <- file.path(archive_dir, manifest$file_name[i])
+
+    if (file.exists(target)) {
+      stamp <- format(Sys.time(), "%Y%m%d-%H%M%S")
+      target <- file.path(
+        archive_dir,
+        sub("\\.nc$", paste0("_", stamp, ".nc"), manifest$file_name[i])
+      )
+    }
+
+    if (!file.rename(path, target)) {
+      stop("Could not move ", path, " to ", target, call. = FALSE)
+    }
+
+    message("Archived (differs from the snapshot): ", manifest$file_name[i], " -> ", target)
+    archived <- c(archived, target)
+  }
+
+  invisible(archived)
+}
+
 # A file is downloaded under a temporary name and renamed once it has the
 # expected size, so an interrupted download is never mistaken for a finished one.
 download_manifest_files <- function(manifest) {
@@ -176,6 +228,12 @@ download_manifest <- rbind(
 
 stopifnot(!anyDuplicated(download_manifest$file_name))
 
+archived_files <- character(0)
+
+if (ARCHIVE_REPLACED_FILES) {
+  archived_files <- archive_mismatched_files(download_manifest)
+}
+
 download_manifest_files(download_manifest)
 
 # Outputs ====================================================================
@@ -209,7 +267,8 @@ invalid_size <- is.na(actual_sizes) |
 
 if (any(invalid_size)) {
   stop(
-    "Files do not match their Zenodo sizes (delete them and run again):\n",
+    "Files do not match their Zenodo sizes (delete them and run again, or set ",
+    "ARCHIVE_REPLACED_FILES <- TRUE to move them to an archive folder):\n",
     paste(download_manifest$file_path[invalid_size], collapse = "\n"),
     call. = FALSE
   )
@@ -220,7 +279,8 @@ invalid_md5 <- is.na(actual_md5) | actual_md5 != download_manifest$expected_md5
 
 if (any(invalid_md5)) {
   stop(
-    "Files do not match their Zenodo md5 checksums (delete them and run again):\n",
+    "Files do not match their Zenodo md5 checksums (delete them and run again, or ",
+    "set ARCHIVE_REPLACED_FILES <- TRUE to move them to an archive folder):\n",
     paste(download_manifest$file_path[invalid_md5], collapse = "\n"),
     call. = FALSE
   )
@@ -251,5 +311,9 @@ message(
   ITHACA_RECORD_ID, " (size and md5): ",
   length(PREC_FILES), " precipitation, ",
   length(EVAP_FILES), " evaporation and ",
-  length(PET_FORCING_FILES), " PET forcing."
+  length(PET_FORCING_FILES), " PET forcing",
+  if (length(archived_files) > 0) {
+    paste0("; archived ", length(archived_files), " replaced file(s) in ", ARCHIVE_FOLDER)
+  },
+  "."
 )
