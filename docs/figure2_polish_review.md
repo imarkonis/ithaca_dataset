@@ -49,3 +49,10 @@ unchanged. Source-family palette, MED/base/member44 and all seven units retained
 - Manually anchored only T. Forests: FLDAS and Flooded: TerraClimate labels in panel (c); retained automatic layout for other labels.
 - Regenerated PDF and 600 dpi PNG; visually inspected exports. Existing scientific assertions pass.
 - Original script and shared styles remain unchanged; no upstream analysis rerun.
+
+## Integration
+
+The approved version now replaces `code/06f_plot_sampling_unit_example.R`.
+The separate `_polish.R` copy was removed, and the output stem no longer has
+`_polish`. Previously generated polish exports remain as the comparison reference.
+The original plotting entry point was rerun without upstream analysis.
