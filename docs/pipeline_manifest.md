@@ -4,7 +4,7 @@
 
 A map of the scripts in `code/`, made by reading the code without running it. Start here: find the scripts a task touches and open only those. After changing a script, rerun what its *Rerun after changing* line lists.
 
-- 26 pipeline scripts, run in name order; 2 parked (`XX_`); 6 archived.
+- 27 pipeline scripts, run in name order; 2 parked (`XX_`); 6 archived.
 - Scripts load `_source.R`: packages (data.table, fst, ggplot2), shared constants, and the `PATH_` folders that 00a saves in `paths.Rdata`. `PATH_SAVE` is set per machine in `_machine_paths.R`.
 - A script reads the copy of a file written by the last script before it in name order.
 - *Runs*: **raw data** and **downloads** need the machine with the raw inputs; **upstream outputs** runs anywhere the earlier outputs exist.
@@ -17,7 +17,7 @@ A map of the scripts in `code/`, made by reading the code without running it. St
 
 **Consistency**
 
-- **Same constant, different values.** FIGURE_HEIGHT_MM: `160` in 06a; `105` in 06b; `165` in 06c; `125` in 06d; `170` in 06e; `170` in 06f.
+- **Same constant, different values.** FIGURE_HEIGHT_MM: `160` in 06a; `105` in 06b; `140` in 06c; `125` in 06d; `170` in 06e; `170` in 06f; `135` in 06g.
 
 **Links not visible here (file names built at run time)**
 
@@ -32,7 +32,7 @@ A map of the scripts in `code/`, made by reading the code without running it. St
 | Script | What it does | Reads from | Runs |
 |---|---|---|---|
 | 00a | Initialize project paths for the ithaca dataset workflow | - | no inputs |
-| 00b | Download raw precipitation, evaporation, and PET data from Zenodo | - | downloads |
+| 00b | Download the raw input data of the ITHACA workflow from the frozen Zenodo input snapshot | - | downloads |
 | 01a | Crop the raw precipitation and evaporation datasets to the study period | - | raw data |
 | 01b | Prepare and widen the cropped yearly precipitation and evaporation datasets for the TWC change workflow | run-time names | upstream outputs |
 | 01c | Convert MERRA2 and MSWX-Past NetCDF forcing into monthly data.tables | run-time names | raw data |
@@ -44,7 +44,7 @@ A map of the scripts in `code/`, made by reading the code without running it. St
 | 03c | (no header) | 03a | upstream outputs |
 | 03d | (no header) | 01e, 03a, 03c | upstream outputs |
 | 03e | Dataset agreement weights for twc_change under TEN weighting scenarios | 03d | upstream outputs |
-| 03f | Aggregate grid-cell dataset agreement weights to region-biome probabilities | 01g, 03e | upstream outputs |
+| 03f | Aggregate grid-cell agreement weights to region-biome sampling probabilities | 01g, 03d, 03e | upstream outputs |
 | 03g | Estimate dataset annual means by IPCC region and biome | 01b, 01g | upstream outputs |
 | 04a | Generate Monte Carlo dataset selections | 03f | upstream outputs |
 | 04b | Aggregate the 100 x 10 scenario Monte Carlo selections to annual P and E ensembles | 01g, 03g, 04a | upstream outputs |
@@ -53,10 +53,11 @@ A map of the scripts in `code/`, made by reading the code without running it. St
 | 05a_region | Compare original datasets and Monte Carlo scenarios in P-E and ΔP-ΔE space for each IPCC region | 01g, 03g, 04b | upstream outputs |
 | 06a | Figure 2: input disagreement | 01f, 01g | upstream outputs |
 | 06b | Figure 3: dataset performance structure | 01g, 03d | upstream outputs |
-| 06c | Figure 4: weighting sensitivity | 01g, 03f | upstream outputs |
+| 06c | Figure 4: weighting sensitivity | 01g, 03e, 03f | upstream outputs |
 | 06d | Figure 5: global product | 01g, 03f, 03g, 04b + run-time names | upstream outputs |
 | 06e | Figure 6: methodological effects | 01g, 03a, 03e, 03f, 04b | upstream outputs |
 | 06f | Figure 2: anatomy of MED region x biome sampling units, MC member 44 | 01g, 03f, 03g, 04a, 04b | upstream outputs |
+| 06g | Mediterranean P-E change and uncertainty: ITHACA CHANGE-weighted ensemble | 03f, 04c | upstream outputs |
 
 ## Dependency graph
 
@@ -99,6 +100,7 @@ flowchart TD
     s06d["06d plot global product"]
     s06e["06e plot methodological effects"]
     s06f["06f plot sampling unit example"]
+    s06g["06g med probabilistic aridification example"]
   end
   s01b --> s01e
   s01b --> s01f
@@ -127,14 +129,17 @@ flowchart TD
   s03a --> s06e
   s03c --> s03d
   s03d --> s03e
+  s03d --> s03f
   s03d --> s06b
   s03e --> s03f
+  s03e --> s06c
   s03e --> s06e
   s03f --> s04a
   s03f --> s06c
   s03f --> s06d
   s03f --> s06e
   s03f --> s06f
+  s03f --> s06g
   s03g --> s04b
   s03g --> s05a_global
   s03g --> s05a_region
@@ -148,6 +153,7 @@ flowchart TD
   s04b --> s06d
   s04b --> s06e
   s04b --> s06f
+  s04c --> s06g
   classDef missing fill:#fdecea,stroke:#c62828,stroke-dasharray: 4 3
   classDef inplace stroke:#ef6c00,stroke-width:3px
   classDef empty fill:#f5f5f5,stroke:#9e9e9e,stroke-dasharray: 2 2
@@ -161,15 +167,15 @@ Orange border: overwrites its input in place. Red: missing input.
 ### 00a_initialize.R
 
 - Writes to PATH_OUTPUT: paths.Rdata (read by _source.R)
-- Rerun after changing: 00b to 06f
+- Rerun after changing: 00b to 06g
 - does not source _source.R
 - Constants: PATH_OUTPUT, PATH_OUTPUT_DATA, PATH_OUTPUT_RAW, PATH_OUTPUT_RAW_PREC, PATH_OUTPUT_RAW_EVAP, PATH_OUTPUT_RAW_OTHER, PATH_OUTPUT_INPUT, PATH_OUTPUT_OUTPUT, PATH_OUTPUT_DATASET, PATH_OUTPUT_FIGURES, PATH_OUTPUT_TABLES
 
 ### 00b_data_download.R
 
 - Rerun after changing: not tracked (outputs are downloads or have names built at run time)
-- packages: jsonlite
-- Constants: PRECIPE_RECORD_ID = "14290970", EVAPORE_RECORD_ID = "21369628", ITHACA_RECORD_ID = "21353180", PREC_NAMES_SHORT_LCASE, PREC_ENSEMBLE_NAMES_SHORT_LCASE, PREC_ALL_NAMES_SHORT_LCASE, PREC_NAMES_PATTERN, EVAP_ENSEMBLE_NAMES_SHORT_LCASE, EVAP_NAMES_PATTERN, ITHACA_FILE_DESTINATIONS
+- packages: jsonlite, tools
+- Constants: ITHACA_RECORD_ID = "23193962", ARCHIVE_REPLACED_FILES = FALSE, ARCHIVE_FOLDER = "archive", DOWNLOAD_ATTEMPTS = 20, STALL_SECONDS = 300
 
 ### 01a_crop_data.R
 
@@ -181,7 +187,7 @@ Orange border: overwrites its input in place. Red: missing input.
 
 - Writes to PATH_OUTPUT_OUTPUT: prec_evap_raw.fst (read by 01f), twc_complete_grid.Rds (read by 01e, 01g), prec_evap.fst (read by 03g, 04c)
 - Names built at run time: `brick(file)`
-- Rerun after changing: 01e to 06f
+- Rerun after changing: 01e to 06g
 - packages: raster; shared: EVAP_NAMES_SHORT, PREC_NAMES_SHORT; random: sample (seeded)
 - Constants: DATASET_NAME_BY_TOKEN
 
@@ -189,7 +195,7 @@ Orange border: overwrites its input in place. Red: missing input.
 
 - Writes to PATH_OUTPUT_RAW_OTHER: merra2_pet-forcing_mixed_1980_2024_025_monthly.fst (read by 01d), mswx-past_pet-forcing_mixed_1980_2024_025_monthly.fst (read by 01d)
 - Names built at run time: `rast(nc_path)`
-- Rerun after changing: 01d, 01e, 03d to 03f, 04a to 05a_region, 06b to 06f
+- Rerun after changing: 01d, 01e, 03d to 03f, 04a to 05a_region, 06b to 06g
 - packages: terra
 - Constants: PERIOD_FIRST_YEAR = 1980, PERIOD_LAST_YEAR = 2024, PERIOD_START, PERIOD_END, MONTHS_PER_YEAR = 12, EXPECTED_MONTH_COUNT, OUTPUT_FILES, COORDINATE_DIGITS = 4, MERGE_KEYS, MERRA2_FILES, MSWX_FILES, FORCING_FILES
 
@@ -197,7 +203,7 @@ Orange border: overwrites its input in place. Red: missing input.
 
 - Reads from PATH_OUTPUT_RAW_OTHER: merra2_pet-forcing_mixed_1980_2024_025_monthly.fst (01c), mswx-past_pet-forcing_mixed_1980_2024_025_monthly.fst (01c)
 - Writes to PATH_OUTPUT_RAW_OTHER: merra2_mswx_pet_mm_1980_2024_yearly.fst (read by 01e)
-- Rerun after changing: 01e, 03d to 03f, 04a to 05a_region, 06b to 06f
+- Rerun after changing: 01e, 03d to 03f, 04a to 05a_region, 06b to 06g
 - Constants: INPUT_FILES, FILE_PET_OUT, PERIOD_FIRST_YEAR = 1980, PERIOD_LAST_YEAR = 2024, MONTHS_PER_YEAR = 12, EXPECTED_YEAR_COUNT, PET_METHOD_COLUMNS, EXPECTED_COMBINATION_COUNT, PET_DECIMAL_DIGITS = 1, REPRESENTATIVE_DAYS, DAYS_IN_MONTH, DAYS_IN_LEAP_FEBRUARY = 29, DAYS_PER_YEAR = 365.25, SOLAR_CONSTANT = 0.082, W_TO_MJ_PER_DAY = 0.0864, STEFAN_BOLTZMANN = 4.903e-09, SURFACE_EMISSIVITY = 0.98, VAPOUR_MASS_RATIO = 0.622, PSYCHROMETRIC_COEFFICIENT = 0.00163, WIND_MEASUREMENT_HEIGHT = 10, HARGREAVES_COEFFICIENT = 0.0023, HARGREAVES_TEMPERATURE_LIMIT = -17.8, OUDIN_TEMPERATURE_LIMIT = -5, OUDIN_SCALE = 100, HAMON_COEFFICIENT, ENERGY_ONLY_COEFFICIENT = 0.8, PRIESTLEY_TAYLOR_ALPHA = 1.26
 
 ### 01e_prepare_pet.R
@@ -205,14 +211,14 @@ Orange border: overwrites its input in place. Red: missing input.
 - Reads from PATH_OUTPUT_RAW_OTHER: merra2_mswx_pet_mm_1980_2024_yearly.fst (01d)
 - Reads from PATH_OUTPUT_OUTPUT: twc_complete_grid.Rds (01b)
 - Writes to PATH_OUTPUT_OUTPUT: pet.fst (not read), pet_mean.fst (read by 03d)
-- Rerun after changing: 03d to 03f, 04a to 05a_region, 06b to 06f
+- Rerun after changing: 03d to 03f, 04a to 05a_region, 06b to 06g
 - packages: lubridate; shared: FULL_PERIOD
 
 ### 01f_prepare_validation_ensemble.R
 
 - Reads from PATH_OUTPUT_OUTPUT: prec_evap_raw.fst (01b)
 - Writes to PATH_OUTPUT_OUTPUT: prec_reference_values.fst (read by 03a, 06a), evap_reference_values.fst (read by 03a, 06a)
-- Rerun after changing: 03a to 03f, 04a to 06f
+- Rerun after changing: 03a to 03f, 04a to 06g
 - packages: trend; shared: EVAP_ENSEMBLE_NAMES_SHORT, EVAP_NAMES_SHORT, FULL_PERIOD, PREC_ENSEMBLE_NAMES_SHORT
 - Constants: P_VALUE_THRESHOLD = 0.1, MIN_YEARS_FOR_TREND
 
@@ -220,7 +226,7 @@ Orange border: overwrites its input in place. Red: missing input.
 
 - Reads from PATH_OUTPUT_OUTPUT: twc_complete_grid.Rds (01b)
 - Writes to PATH_OUTPUT_OUTPUT: region_classes.Rds (read by 06e), grid_classes.Rds (read by 03f, 03g, 04b to 06f)
-- Rerun after changing: 03f to 06f
+- Rerun after changing: 03f to 06g
 - packages: pRecipe
 - Constants: EXCLUDED_REGIONS, HEMISPHERE_LEVELS, LAT_ZONE_LEVELS, LAT_TROPICS = 23.5, LAT_MIDLATITUDE = 35, LAT_HIGHLATITUDE = 60
 
@@ -228,35 +234,36 @@ Orange border: overwrites its input in place. Red: missing input.
 
 - Reads from PATH_OUTPUT_OUTPUT: prec_reference_values.fst (01f), evap_reference_values.fst (01f)
 - Writes to PATH_OUTPUT_OUTPUT: dataset_ranks.Rds (read by 03c), prec_evap_stats.Rds (read by 03c, 03d, 06e)
-- Rerun after changing: 03c to 03f, 04a to 05a_region, 06b to 06f
+- Rerun after changing: 03c to 03f, 04a to 05a_region, 06b to 06g
 - Constants: EPSILON = 1e-06, PROPERTY_BIAS
 
 ### 03c_dataset_aridity_check.R
 
 - Reads from PATH_OUTPUT_OUTPUT: prec_evap_stats.Rds (03a), dataset_ranks.Rds (03a)
 - Writes to PATH_OUTPUT_OUTPUT: dataset_ranks.Rds (overwritten in place; read by 03d)
-- Rerun after changing: 03a, then this script (it overwrites `dataset_ranks.Rds` in place), then 03d to 03f, 04a to 05a_region, 06b to 06f
+- Rerun after changing: 03a, then this script (it overwrites `dataset_ranks.Rds` in place), then 03d to 03f, 04a to 05a_region, 06b to 06g
 - Constants: ARIDITY_THRES = 0.9
 
 ### 03d_pet_check.R
 
 - Reads from PATH_OUTPUT_OUTPUT: prec_evap_stats.Rds (03a), pet_mean.fst (01e), dataset_ranks.Rds (03c)
-- Writes to PATH_OUTPUT_OUTPUT: dataset_ranks.Rds (overwritten in place; read by 03e, 06b)
-- Rerun after changing: 03a, 03c, then this script (it overwrites `dataset_ranks.Rds` in place), then 03e, 03f, 04a to 05a_region, 06b to 06f
+- Writes to PATH_OUTPUT_OUTPUT: dataset_ranks.Rds (overwritten in place; read by 03e, 03f, 06b)
+- Rerun after changing: 03a, 03c, then this script (it overwrites `dataset_ranks.Rds` in place), then 03e, 03f, 04a to 05a_region, 06b to 06g
 
 ### 03e_dataset_agreement_weights.R
 
 - Reads from PATH_OUTPUT_OUTPUT: dataset_ranks.Rds (03d)
-- Writes to PATH_OUTPUT_OUTPUT: dataset_weights.Rds (read by 03f), dataset_weights_base_detailed.Rds (not read), dataset_weight_diagnostics.Rds (read by 06e)
-- Rerun after changing: 03f, 04a to 05a_region, 06c to 06f
+- Writes to PATH_OUTPUT_OUTPUT: dataset_weights.Rds (read by 03f, 06c), dataset_weights_base_detailed.Rds (not read), dataset_weight_diagnostics.Rds (read by 06e)
+- Rerun after changing: 03f, 04a to 05a_region, 06c to 06g
 - packages: grid, maps
 - Constants: SHARES_BASE, CHANGE_TREND_SHARE = 0.75, CHANGE_SIG_SHARE = 0.75, RANK_SLOPE_SHARE = 0.5, RANK_EXP_BASE = 0.5, RANK_N, RANK_COLS, WEIGHT_SCENARIOS, LOSS_WEIGHT_MAP, COMBINE_SPEC, REQUIRED_COLS, BASE_OUTPUT_COLS, TRANSFORMS
 
 ### 03f_estimate_regional_weights.R
 
-- Reads from PATH_OUTPUT_OUTPUT: dataset_weights.Rds (03e), grid_classes.Rds (01g)
-- Writes to PATH_OUTPUT_OUTPUT: weights_region_biome.Rds (read by 04a, 06c to 06f)
-- Rerun after changing: 04a to 05a_region, 06c to 06f
+- Reads from PATH_OUTPUT_OUTPUT: dataset_weights.Rds (03e), dataset_ranks.Rds (03d), grid_classes.Rds (01g)
+- Writes to PATH_OUTPUT_OUTPUT: weights_region_biome.Rds (read by 04a, 06c to 06g), regional_physical_coverage.Rds (not read)
+- Rerun after changing: 04a to 05a_region, 06c to 06g
+- Constants: REGIONAL_COVERAGE_THRESHOLD = 0.8
 
 ### 03g_region_biome_prec_evap.R
 
@@ -269,7 +276,7 @@ Orange border: overwrites its input in place. Red: missing input.
 
 - Reads from PATH_OUTPUT_OUTPUT: weights_region_biome.Rds (03f)
 - Writes to PATH_OUTPUT_OUTPUT: weight_cdf_scenarios.Rds (read by 06f), mc_random_region_biome_scenarios.Rds (not read), mc_selection_scenarios.Rds (read by 04b, 04c, 06f), mc_selection_matrix_scenarios.Rds (not read), mc_selection_change.Rds (not read)
-- Rerun after changing: 04b to 05a_region, 06d to 06f
+- Rerun after changing: 04b to 05a_region, 06d to 06g
 - random: runif (seeded)
 - Constants: N_SIMS_SENSITIVITY = 100L, N_SIMS_CHANGE = 1000L, MC_SEED = 1979L, CHANGE_SCENARIO = "change"
 
@@ -282,8 +289,8 @@ Orange border: overwrites its input in place. Red: missing input.
 ### 04c_create_gridded_mc_ensemble.R
 
 - Reads from PATH_OUTPUT_OUTPUT: prec_evap.fst (01b), grid_classes.Rds (01g), mc_selection_scenarios.Rds (04a)
-- Writes to PATH_OUTPUT_DATASET: dataset_lookup.csv (not read), region_lookup.csv (not read), biome_lookup.csv (not read), manifest.csv (not read)
-- Rerun after changing: nothing downstream
+- Writes to PATH_OUTPUT_DATASET: dataset_lookup.csv (not read), region_lookup.csv (read by 06g), biome_lookup.csv (read by 06g), manifest.csv (read by 06g)
+- Rerun after changing: 06g
 - packages: ncdf4
 - Constants: PUBLIC_SCENARIOS, N_MEMBERS = 100L, MEMBER_BATCH_SIZE = 20L, NC_MISSING = -9999, N_CELLS
 
@@ -317,9 +324,10 @@ Orange border: overwrites its input in place. Red: missing input.
 
 ### 06c_plot_weighting_sensitivity.R
 
-- Reads from PATH_OUTPUT_OUTPUT: weights_region_biome.Rds (03f), grid_classes.Rds (01g)
+- Reads from PATH_OUTPUT_OUTPUT: weights_region_biome.Rds (03f), grid_classes.Rds (01g), dataset_weights.Rds (03e)
 - Rerun after changing: nothing downstream
-- Constants: N_CANDIDATES, TIE_TOLERANCE = 1e-06, ROBUSTNESS_EXCLUDED = "neutral", SUPPORT_SCENARIO = "neutral", N_VOTERS, NEFF_LIMITS, LEVEL_TIE = "Tie", LEVEL_NO_DATA = "No candidate", LEVEL_EMPTIED = "Unit emptied by the gate", FIGURE_HEIGHT_MM = 165
+- packages: grid, scales
+- Constants: GATE_SCENARIO = "neutral", N_CANDIDATES, N_SCENARIOS, SCENARIOS_OTHER, N_OTHER, LEVEL_NO_DATA = "No data", FIGURE_HEIGHT_MM = 140, ROW_HEIGHTS, PANEL_MARGIN, CHANGE_LIMIT, FLIP_LIMIT
 
 ### 06d_plot_global_product.R
 
@@ -344,12 +352,21 @@ Orange border: overwrites its input in place. Red: missing input.
 - packages: ggrepel, scales; shared: FULL_PERIOD
 - Constants: EXAMPLE_REGION = "MED", EXAMPLE_SCENARIO = "base", EXAMPLE_MEMBER = 44L, EXPECTED_MEMBERS = 100L, EXPECTED_YEARS, WEIGHT_TOLERANCE = 1e-06, VALUE_TOLERANCE = 1e-08, GRID_RESOLUTION = 0.25, MAP_PADDING = 1, FIGURE_HEIGHT_MM = 170, LABEL_SPACE_YEARS = 17, LABEL_NUDGE_YEARS = 3, EXAMPLE_STEM, DATASET_LABELS
 
+### 06g_med_probabilistic_aridification_example.R
+
+- Reads from PATH_OUTPUT_DATASET: manifest.csv (04c), region_lookup.csv (04c), biome_lookup.csv (04c)
+- Reads from PATH_OUTPUT_OUTPUT: weights_region_biome.Rds (03f)
+- Writes to PATH_OUTPUT_FIGURES: fig_med_pe_change_plot_data.Rds (not read)
+- Rerun after changing: nothing downstream
+- packages: ncdf4, patchwork, scales, stats; shared: END_PERIOD_1, END_PERIOD_2, START_PERIOD_1, START_PERIOD_2
+- Constants: SCENARIO = "change", REGION = "MED", EARLY_YEARS, LATE_YEARS, ALL_YEARS, SPREAD_METRIC = "delta_q90_width", EXPECTED_MEMBERS = 100L, WEIGHT_SUM_TOL = 1e-06, TOP_WEIGHT_TOL = 1e-12, GRID_RESOLUTION = 0.25, MAP_PADDING = 1, FIGURE_HEIGHT_MM = 135, FILE_STEM, MED_XLIM, MED_YLIM, DATASET_PALETTE, SOURCE_LABELS
+
 ## Shared setup
 
-- `_figs.R`: _figs.R -- shared publication-figure design system (COSMETICS ONLY). Sourced by 7 scripts.
-- `_figure_helpers.R`: Shared helpers for the figure scripts 06a-06f. Sourced by 6 scripts.
+- `_figs.R`: _figs.R -- shared publication-figure design system (COSMETICS ONLY). Sourced by 8 scripts.
+- `_figure_helpers.R`: Shared helpers for the figure scripts 06a-06f. Sourced by 7 scripts.
 - `_machine_paths.R`: Machine-specific base path for the ithaca_dataset workflow. Sourced by 00a, _source.R.
-- `_source.R`: Sourced by 25 scripts.
+- `_source.R`: Sourced by 26 scripts.
 
 | Shared constant | Value | Used by (directly or through another) |
 |---|---|---|
@@ -361,10 +378,10 @@ Orange border: overwrites its input in place. Red: missing input.
 | EVAP_ENSEMBLE_NAMES_SHORT | `c("BESS", "ERA5L", "ETMON", "ETSYN", "FLDAS", "GLEAM", "M...` | 01a, 01f, 06a |
 | EVAP_ALL_NAMES_SHORT | `unique(c(EVAP_NAMES_SHORT, EVAP_ENSEMBLE_NAMES_SHORT))` | 01a |
 | N_DATASETS_EVAP | `length(EVAP_ALL_NAMES_SHORT)` | 01a |
-| START_PERIOD_1 | `1982` | 01a, 01e, 01f, 06e, 06f |
-| END_PERIOD_1 | `2001` | - |
-| START_PERIOD_2 | `2002` | - |
-| END_PERIOD_2 | `2021` | 01a, 01e, 01f, 06e, 06f |
+| START_PERIOD_1 | `1982` | 01a, 01e, 01f, 06e to 06g |
+| END_PERIOD_1 | `2001` | 06g |
+| START_PERIOD_2 | `2002` | 06g |
+| END_PERIOD_2 | `2021` | 01a, 01e, 01f, 06e to 06g |
 | FULL_PERIOD | `c(START = START_PERIOD_1, END = END_PERIOD_2)` | 01a, 01e, 01f, 06e, 06f |
 | MY_PALETTE | `c("#4D648D", "#337BAE", "#97B8C2", "#739F3D", "#ACBD78", ...` | - |
 

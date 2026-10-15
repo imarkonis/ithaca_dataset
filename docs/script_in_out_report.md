@@ -33,16 +33,17 @@ Defines the project folders under `PATH_SAVE`, creates them, and saves the path 
 
 ### <a name="s00b"></a>00b_data_download.R
 
-Downloads the raw yearly land precipitation and evaporation NetCDF files from the pRecipe and evapoRe Zenodo records, plus GPCC and the MERRA-2/MSWX PET table from the ITHACA Zenodo record, and checks each file against its Zenodo size.
+Downloads every NetCDF file of one pinned Zenodo record, the frozen ITHACA input snapshot (version `v3`, [10.5281/zenodo.23193962](https://doi.org/10.5281/zenodo.23193962); 35 files: 9 yearly land precipitation files including GPCC, 8 yearly land evaporation files and 18 monthly PET forcing files). The record defines the inputs and the script holds no file list. The raw folder of each file follows from its name (`*_tp_*_yearly.nc` precipitation, `*_e_*_yearly.nc` evaporation, `*_monthly.nc` PET forcing); a NetCDF name that fits none of them, or a folder left without files, stops the script. Every file is checked against the size and md5 checksum Zenodo lists for it. Downloads use the `curl` command line tool: an interrupted file is continued from its `.part` file (in the same run, up to `DOWNLOAD_ATTEMPTS` times, or in the next run), a connection that moves less than 1 kB/s for `STALL_SECONDS` is dropped and resumed, and there is no time limit on a whole download. Files that are not NetCDF are not downloaded: the record also holds the derived PET table, but [01c](#s01c) and [01d](#s01d) derive PET from the forcing. A file that already exists but differs from the snapshot stops the script; with `ARCHIVE_REPLACED_FILES <- TRUE` it is instead moved to an `archive` folder inside its raw folder and the snapshot copy is downloaded.
 
 **Inputs**
-- Zenodo records pRecipe `14290970`, evapoRe `21369628`, ITHACA `21353180` (web, not files from a script).
+- Zenodo record `23193962`, the frozen ITHACA input snapshot (web, not files from a script). The pRecipe, evapoRe and tempeR records the files originate from are not read.
 - [`paths.Rdata`](#f_paths_Rdata) through `_source.R` (from [00a](#s00a)).
 
 **Outputs**
-- <a name="f_raw_prec_nc"></a>`*.nc` in `PATH_OUTPUT_RAW_PREC`: raw yearly land precipitation NetCDFs, named `<dataset>_tp_mm_land_<start>_<end>_025_yearly.nc`: the pRecipe files whose names contain `land`, `yearly` and one of era5-land, fldas, merra, terraclimate, mswep, cpc, em-earth, precl, plus `gpcc-v2022_tp_mm_land_198101_202012_025_yearly.nc` from the ITHACA record. NetCDF, so no columns; the variable and dimension names inside are those of the Zenodo files and are not defined in this repo (check).
-- <a name="f_raw_evap_nc"></a>`*.nc` in `PATH_OUTPUT_RAW_EVAP`: raw yearly land evaporation NetCDFs, named `<dataset>_e_mm_land_<start>_<end>_025_yearly.nc`: the evapoRe files whose names contain `land`, `yearly`, `_e_` and one of bess, era5-land, etmonitor, etsynthesis, fldas, gleam-v4-1a, merra, terraclimate. Same remark on the contents (check).
-- `merra2_mswx_pet_mm_1980_2024_yearly.fst` in `PATH_OUTPUT_RAW_OTHER`: downloaded from the ITHACA record. It is the file that [01d](#s01d) writes; columns are described [there](#f_pet_yearly_fst).
+- <a name="f_raw_prec_nc"></a>`*.nc` in `PATH_OUTPUT_RAW_PREC`: the raw yearly land precipitation NetCDFs of the record (9 in v3), named `<dataset>_tp_mm_land_<start>_<end>_025_yearly.nc` (cpc-global, em-earth, era5-land, fldas, gpcc-v2022, merra-2, mswep-v2-8, precl, terraclimate). NetCDF, so no columns; the variable and dimension names inside are those of the Zenodo files and are not defined in this repo (check).
+- <a name="f_raw_evap_nc"></a>`*.nc` in `PATH_OUTPUT_RAW_EVAP`: the raw yearly land evaporation NetCDFs of the record (8 in v3), named `<dataset>_e_mm_land_<start>_<end>_025_yearly.nc` (bess, era5-land, etmonitor, etsynthesis, fldas, gleam-v4-1a, merra2, terraclimate). Same remark on the contents (check).
+- <a name="f_raw_forcing_nc"></a>`*.nc` in `PATH_OUTPUT_RAW_OTHER`: the monthly 0.25° PET forcing NetCDFs of the record (18 in v3): 9 MERRA-2, 8 MSWX-Past and the ERA5-Land albedo. Same remark on the contents (check).
+- `archive/` inside each of the three raw folders, only when `ARCHIVE_REPLACED_FILES` is TRUE: the existing files that differed from the snapshot, under their own name (with a timestamp added if that name is already in the archive). `01a` does not read these folders.
 
 ### <a name="s01a"></a>01a_crop_data.R
 
@@ -72,7 +73,7 @@ Reads each cropped NetCDF into a long land-only table, keeps the grid cells cove
 Converts the monthly MERRA-2 and MSWX-Past forcing NetCDFs (plus ERA5-Land albedo for MSWX-Past) into one monthly data.table per source, clipped to 1980–2024.
 
 **Inputs**
-- 18 monthly 0.25° NetCDFs in `PATH_OUTPUT_RAW_OTHER`, named in `MERRA2_FILES` (9 files) and `MSWX_FILES` (8 MSWX-Past files plus `era5-land_albedo_198001_202501_025_monthly.nc`). No script in the repo writes them and `00b` does not download them (check). `docs/pet_input.md` describes them and `docs/input-dataset-metadata-table.csv` links some of them to Zenodo records.
+- [18 monthly 0.25° NetCDFs](#f_raw_forcing_nc) in `PATH_OUTPUT_RAW_OTHER`, downloaded by [00b](#s00b), named in `MERRA2_FILES` (9 files) and `MSWX_FILES` (8 MSWX-Past files plus `era5-land_albedo_198001_202501_025_monthly.nc`). `docs/pet_input.md` describes them and `docs/input-dataset-metadata-table.csv` links some of them to Zenodo records.
 
 **Outputs** (both in `PATH_OUTPUT_RAW_OTHER`; units are the ones in the input file names, as the script's comment says; rows with any missing variable are dropped)
 - <a name="f_forcing_merra2"></a>`merra2_pet-forcing_mixed_1980_2024_025_monthly.fst`: data.table keyed on x, y, date, with x (longitude, rounded to 4 decimals), y (latitude), date (Date, one per month, 1980–2024), tavg (2 m mean air temperature, °C), tmax (2 m daily maximum, °C), tmin (2 m daily minimum, °C), sw_rad (downwelling shortwave, W m⁻²), lw_rad (downwelling longwave, W m⁻²), pres (surface pressure, Pa), u_wind (2 m eastward wind, m s⁻¹), v_wind (2 m northward wind, m s⁻¹), spec_hum (2 m specific humidity, kg kg⁻¹). The comment in the script says every date is moved to the first of its month before merging; the code only converts it with `as.Date` (check).
@@ -93,7 +94,7 @@ Estimates yearly potential evapotranspiration for every grid cell with six metho
 Restricts the yearly PET table to 1982–2021 and the TWC grid, reshapes it to long format by method, and computes full-period means per cell, source and method.
 
 **Inputs**
-- [`merra2_mswx_pet_mm_1980_2024_yearly.fst`](#f_pet_yearly_fst) in `PATH_OUTPUT_RAW_OTHER`, from [01d](#s01d) (or downloaded by [00b](#s00b)).
+- [`merra2_mswx_pet_mm_1980_2024_yearly.fst`](#f_pet_yearly_fst) in `PATH_OUTPUT_RAW_OTHER`, from [01d](#s01d).
 - [`twc_complete_grid.Rds`](#f_twc_complete_grid_Rds), from [01b](#s01b).
 
 **Outputs** (in `PATH_OUTPUT_OUTPUT`; x, y and source of the input are renamed lon, lat, dataset)
@@ -330,7 +331,6 @@ This script cannot run as written: one input is written by no script and `PALETT
 - **01a, cropped NetCDF contents:** the cropped files' variable names are written by pRecipe's `subset_data` and `saveNC`, not by this repo.
 - **01b, coverage test:** `prec_evap_raw.fst` and `twc_complete_grid.Rds` keep the cells covered by every dataset, but the code counts distinct dataset names across precipitation and evaporation together (`uniqueN(dataset)`), so a cell missing, say, ERA5L precipitation but having ERA5L evaporation still counts ERA5L.
 - **01b, header comment:** says `prec_evap.Rds` is saved; the code writes `prec_evap.fst`.
-- **01c, input files:** the 18 forcing NetCDFs are not written by any script and `00b` does not download them.
 - **01c, dates:** the comment says dates are moved to the first of their month before merging; the code only converts them with `as.Date`.
 - **01g, NA classes:** cells of the TWC grid with no match in the pRecipe land mask keep NA in region and the other class columns, and the region filter does not remove them.
 - **01g, pRecipe values:** the class values (region codes, biome names, Köppen-Geiger and land-cover classes) come from `pRecipe_masks()` and may differ between pRecipe versions.
