@@ -1,4 +1,6 @@
 # ============================================================================
+# Figure 2 publication layout finalized for issue #69.
+# AI-assisted layout revision: Codex, 15 October 2026.
 # Figure 2: anatomy of MED region x biome sampling units, MC member 44.
 #
 # (a) Native 0.25-degree biome cells; (b) exact sampling weights with each unit's
@@ -17,6 +19,18 @@ library(ggrepel)      # keep every biome's source label readable
 
 # Constants & Variables ======================================================
 
+# Figure-local typography adjustment requested for this figure.
+LOCAL_FONT_INCREMENT_PT <- 0.5
+FIG_BASE_SIZE <- FIG_BASE_SIZE + LOCAL_FONT_INCREMENT_PT
+FIG_AXIS_TITLE_SIZE <- FIG_AXIS_TITLE_SIZE + LOCAL_FONT_INCREMENT_PT
+FIG_AXIS_TEXT_SIZE <- FIG_AXIS_TEXT_SIZE + LOCAL_FONT_INCREMENT_PT
+FIG_LEGEND_TITLE_SIZE <- FIG_LEGEND_TITLE_SIZE + LOCAL_FONT_INCREMENT_PT
+FIG_LEGEND_TEXT_SIZE <- FIG_LEGEND_TEXT_SIZE + LOCAL_FONT_INCREMENT_PT
+FIG_STRIP_SIZE <- FIG_STRIP_SIZE + LOCAL_FONT_INCREMENT_PT
+FIG_TAG_SIZE <- FIG_TAG_SIZE + LOCAL_FONT_INCREMENT_PT
+FIG_ANNOTATION_SIZE <- FIG_ANNOTATION_SIZE + LOCAL_FONT_INCREMENT_PT
+FIG_GEOM_TEXT_SIZE <- pt_to_size(FIG_ANNOTATION_SIZE)
+
 EXAMPLE_REGION <- "MED"
 EXAMPLE_SCENARIO <- "base"
 EXAMPLE_MEMBER <- 44L # requested worked realization; never generate new draws
@@ -26,10 +40,24 @@ WEIGHT_TOLERANCE <- 1e-6
 VALUE_TOLERANCE <- 1e-8
 GRID_RESOLUTION <- 0.25
 MAP_PADDING <- 1 # degrees, context around the full MED grid
-FIGURE_HEIGHT_MM <- 170
+FIGURE_HEIGHT_MM <- 150
+# Figure-specific composition: dedicate a compact row to the two legends.
+LOCAL_ROW_HEIGHTS <- c(1, 0.42, 1, 1)
+# Additional gutter approximately one four-digit axis label wide.
+LOCAL_AB_GAP_MM <- 5.5
+LOCAL_LEGEND_B_TOP_MM <- 2.3 # match the Biome heading baseline
+LOCAL_LEGEND_A_INSET_MM <- 18 # align biome legend with the map y-axis
+LOCAL_LEGEND_B_INSET_MM <- 6 # breathing room after the three-column source legend
+# Local layout adjustments: inset (b), and trim facing P/E panel margins.
+LOCAL_B_TAG_POSITION <- c(0.025, 0.96)
+LOCAL_CD_MARGIN_PT <- 0
 # Reserve an unplotted future interval for direct labels; no data extrapolation.
 LABEL_SPACE_YEARS <- 17
 LABEL_NUDGE_YEARS <- 3
+# Panel (c) only: anchor the forest and flooded connectors at label left edges.
+LOCAL_FOREST_LABEL_Y <- 940
+LOCAL_FLOODED_LABEL_Y <- 220
+LOCAL_FOREST_CONNECTOR_GAP_YEARS <- 0.2
 EXAMPLE_STEM <- paste0("fig2_sampling_unit_", tolower(EXAMPLE_REGION), "_", EXAMPLE_SCENARIO,
                        "_member", EXAMPLE_MEMBER)
 DATASET_LABELS <- c(
@@ -65,22 +93,46 @@ require_columns <- function(dt, cols, name) {
 require_unique <- function(dt, key, name) {
   if (anyDuplicated(dt, by = key)) stop("Duplicate keys in ", name, call. = FALSE)
 }
+# Match the draw legend key to the vertical markers in panel (b).
+draw_key_vertical <- function(data, params, size) {
+  grid::grobTree(ggplot2::draw_key_path(data, params, size),
+                 vp = grid::viewport(angle = 90))
+}
 annual_panel <- function(variable, y_label) {
   year_breaks <- pretty(EXPECTED_YEARS, n = 6)
   year_breaks <- year_breaks[year_breaks >= min(EXPECTED_YEARS) & year_breaks <= max(EXPECTED_YEARS)]
   labels <- member44[year == max(EXPECTED_YEARS)]
   labels[, source_label := paste0(biome, ": ", DATASET_LABELS[as.character(dataset)])]
+  manual_label <- variable == "prec" & (
+    (labels$biome == "T. Forests" & labels$dataset == "FLDAS") |
+    (labels$biome == "Flooded" & labels$dataset == "TERRA"))
+  top_label <- copy(labels[manual_label])
+  top_label[, label_y := ifelse(biome == "Flooded", LOCAL_FLOODED_LABEL_Y,
+                                LOCAL_FOREST_LABEL_Y)]
+  manual_layers <- if (nrow(top_label)) list(
+    geom_segment(data = top_label,
+      aes(x = year, y = prec, yend = label_y),
+      xend = max(EXPECTED_YEARS) + LABEL_NUDGE_YEARS - LOCAL_FOREST_CONNECTOR_GAP_YEARS,
+      colour = COL_CONTEXT,
+      linewidth = FIG_BOUNDARY_LINEWIDTH),
+    geom_text(data = top_label, aes(label = source_label, y = label_y),
+      x = max(EXPECTED_YEARS) + LABEL_NUDGE_YEARS,
+      hjust = 0, family = FIG_FONT, size = FIG_GEOM_TEXT_SIZE, colour = COL_TEXT)
+  ) else NULL
   ggplot() +
     geom_line(data = member44, aes(year, .data[[variable]], colour = biome, group = biome),
               linewidth = FIG_LINEWIDTH) +
     ggrepel::geom_text_repel(data = labels,
       aes(year, .data[[variable]], label = source_label),
       colour = COL_TEXT, family = FIG_FONT, size = FIG_GEOM_TEXT_SIZE,
+      alpha = ifelse(manual_label, 0, 1),
+      segment.alpha = ifelse(manual_label, 0, 1),
       segment.color = COL_CONTEXT, segment.size = FIG_BOUNDARY_LINEWIDTH,
       box.padding = FIG_LABEL_PADDING, force = FIG_LABEL_FORCE,
       hjust = 0, direction = "y", nudge_x = LABEL_NUDGE_YEARS,
       xlim = c(max(EXPECTED_YEARS) + 1, max(EXPECTED_YEARS) + LABEL_SPACE_YEARS),
       seed = EXAMPLE_MEMBER, max.overlaps = Inf, min.segment.length = 0) +
+    manual_layers +
     scale_colour_cat(values = PAL_BIOMES, breaks = sampled_order, name = "Biome") +
     scale_x_continuous(breaks = year_breaks, labels = label_minus, expand = expansion(mult = 0)) +
     scale_y_continuous(labels = label_minus) +
@@ -219,14 +271,15 @@ p_a <- ggplot(med_grid, aes(lon, lat, fill = mapped_biome)) +
   coord_quickmap(xlim = x_extent, ylim = y_extent, expand = FALSE) +
   scale_x_continuous(labels = label_lon) + scale_y_continuous(labels = label_lat) +
   theme_pub_map(legend_position = "bottom") +
-  guides(fill = guide_legend(ncol = 2))
+  guides(fill = guide_legend(ncol = 3, byrow = FALSE))
 p_b <- ggplot() +
   geom_rect(data = bars, aes(xmin = p_low, xmax = p_high,
              ymin = y - FIG_BAR_HALF_HEIGHT, ymax = y + FIG_BAR_HALF_HEIGHT, fill = dataset)) +
   geom_segment(data = draws44, aes(x = u, xend = u,
                y = y - FIG_BAR_HALF_HEIGHT, yend = y + FIG_BAR_HALF_HEIGHT,
                linetype = draw_label),
-               colour = COL_BLACK, linewidth = FIG_DRAW_LINEWIDTH) +
+               colour = COL_BLACK, linewidth = FIG_DRAW_LINEWIDTH,
+               key_glyph = draw_key_vertical) +
   scale_linetype_manual(name = NULL, values = setNames(FIG_LINETYPES[1], draw_label)) +
   scale_fill_cat(values = PAL_DATASETS, breaks = CANDIDATES,
                  labels = DATASET_LABELS, name = "Source P-E pair", drop = FALSE) +
@@ -236,18 +289,62 @@ p_b <- ggplot() +
   coord_cartesian(xlim = c(0, 1)) +
   labs(x = "Cumulative sampling probability", y = NULL) +
   theme_pub(legend_position = "bottom") +
-  guides(fill = guide_legend(ncol = 2, byrow = TRUE))
+  guides(fill = guide_legend(ncol = 3, byrow = TRUE, order = 1),
+         linetype = guide_legend(order = 2))
 p_c <- annual_panel("prec", expression(P~(mm~yr^{-1})))
 p_d <- annual_panel("evap", expression(E~(mm~yr^{-1})))
+p_c <- p_c + theme(plot.margin = margin(FIG_MARGIN_PT[1], FIG_MARGIN_PT[2],
+                                        LOCAL_CD_MARGIN_PT, FIG_MARGIN_PT[4]))
+p_d <- p_d + theme(plot.margin = margin(LOCAL_CD_MARGIN_PT, FIG_MARGIN_PT[2],
+                                        FIG_MARGIN_PT[3], FIG_MARGIN_PT[4]))
+# Compact categorical keys; reuse shared sizes without changing other figures.
+compact_legend <- theme(
+  legend.key.width = grid::unit(FIG_LEGEND_KEY_MM, "mm"),
+  legend.key.height = grid::unit(FIG_LEGEND_KEY_MM, "mm"),
+  legend.spacing.y = grid::unit(FIG_PANEL_SPACING_MM / 2, "mm"),
+  legend.box.spacing = grid::unit(FIG_PANEL_SPACING_MM / 2, "mm"),
+  plot.margin = margin(0, 0, 0, 0)
+)
+p_a <- p_a + compact_legend +
+  theme(legend.justification = "left", legend.box.just = "left")
+p_b <- p_b + compact_legend +
+  theme(legend.justification = "left", legend.box.just = "left",
+        legend.key.spacing.x = grid::unit(0, "mm"))
+
+# Legends have their own row: map aspect ratio no longer creates empty space
+# between the map and its legend. Wrapped legend grobs do not receive tags.
+legend_only <- function(plot, inset_mm, top_mm = 0) {
+  built <- build_grob(plot) # shared ragg-based font measurement
+  guide <- gtable::gtable_filter(built, "guide-box-bottom", trim = TRUE)
+  # Top-align both legend boxes so their headings share one baseline.
+  box <- guide$grobs[[1]]
+  box$heights[1] <- grid::unit(0, "mm")
+  box$heights[length(box$heights)] <- grid::unit(1, "null")
+  guide$grobs[[1]] <- box
+  inset_guide <- gtable::gtable_add_cols(
+    guide, grid::unit(inset_mm, "mm"), pos = 0)
+  inset_guide <- gtable::gtable_add_rows(inset_guide, grid::unit(top_mm, "mm"), pos = 0)
+  wrap_elements(full = inset_guide, ignore_tag = TRUE)
+}
+legend_a <- legend_only(p_a, LOCAL_LEGEND_A_INSET_MM)
+legend_b <- legend_only(p_b, LOCAL_LEGEND_B_INSET_MM, LOCAL_LEGEND_B_TOP_MM)
+top_widths <- grid::unit(c(0.60, LOCAL_AB_GAP_MM, 0.40), c("null", "mm", "null"))
+top_panels <- ((p_a + theme(legend.position = "none")) | plot_spacer() |
+              (p_b + theme(legend.position = "none", plot.tag.position = LOCAL_B_TAG_POSITION))) +
+  plot_layout(widths = top_widths)
+# Keep the wider three-column legends independent of the plot width split.
+legend_widths <- grid::unit(c(1, LOCAL_AB_GAP_MM, 1), c("null", "mm", "null"))
+legend_row <- (legend_a | plot_spacer() | legend_b) + plot_layout(widths = legend_widths)
 figure_example <- add_panel_tags(
-  (p_a | p_b) / p_c / p_d + plot_layout(heights = c(1.25, 1, 1))
+  top_panels / legend_row / p_c / p_d +
+    plot_layout(heights = LOCAL_ROW_HEIGHTS)
 )
 
 # Outputs ====================================================================
 
 figure_stem <- file.path(PATH_OUTPUT_FIGURES, EXAMPLE_STEM)
 save_figure(figure_example, file_stem = figure_stem,
-            width_mm = FIG_WIDTH_DOUBLE, height_mm = FIGURE_HEIGHT_MM)
+            width_mm = FIG_WIDTH_DOUBLE, height_mm = FIGURE_HEIGHT_MM, dpi_png = 600)
 check_fonts(paste0(figure_stem, ".pdf"))
 caption <- sprintf(paste0(
   "Anatomy of Mediterranean (IPCC MED) region x biome sampling units, %d-%d, base scenario, member %d. ",
