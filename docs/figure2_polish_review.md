@@ -38,3 +38,14 @@ Preview tile-seam artifact was intentionally left unchanged at the user's reques
 
 This is a reviewable layout revision. Caption and all scientific content remain
 unchanged. Source-family palette, MED/base/member44 and all seven units retained.
+
+## Final interactive polish
+
+- Increased all figure text by 0.5 pt using figure-local profile overrides.
+- Set top panels to 60:40, retaining independent legend widths.
+- Used three-column legends, a vertical MC draw key, and source legend before draw legend.
+- Aligned legend headings and moved the source legend left for right-edge breathing room.
+- Adjusted panel (b) tag and reduced the P/E inter-panel gap.
+- Manually anchored only T. Forests: FLDAS and Flooded: TerraClimate labels in panel (c); retained automatic layout for other labels.
+- Regenerated PDF and 600 dpi PNG; visually inspected exports. Existing scientific assertions pass.
+- Original script and shared styles remain unchanged; no upstream analysis rerun.
